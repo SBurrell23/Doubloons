@@ -337,8 +337,17 @@
 }
 /* Slimmer tabs so all six sit on one row in the wide guide modal;
    they still wrap gracefully if the window is genuinely narrow. */
-.guide .tabs { justify-content: center; }
-.guide .tab { padding: 0.55em 0.7em; letter-spacing: 0.07em; }
+/* Six equal tabs filling the strip, so the bar reads as one piece
+   instead of a huddle on the left of a very wide modal. */
+.guide .tabs { display: flex; gap: 2px; }
+.guide .tab {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  padding: 0.6em 0.5em;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
 .guide .tab .icon { margin-right: -0.1em; }
 .guide__page { animation: fade-in 0.16s ease; }
 .guide__heading {
