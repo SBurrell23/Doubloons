@@ -377,8 +377,7 @@ const SHORTCUTS = [
   ['Space', 'Back to the table'],
   ['1 – 5', 'Take a gem of that colour'],
   ['Enter', 'Confirm the gems you have picked'],
-  ['Esc', 'Cancel a pick, or close a panel'],
-  ['S', 'Open these settings'],
+  ['Esc', 'Cancel a pick, close a panel, or open these settings'],
   ['H', 'How to play'],
   ['L', 'Show or hide the log'],
 ];

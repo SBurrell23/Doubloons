@@ -1039,11 +1039,8 @@ export function createHud(mount, {
       confirmGems();
       return;
     }
-    if (event.key === 'Escape') {
-      if (inspector) closeInspector();
-      else clearPending();
-      return;
-    }
+    // Escape is handled centrally so it can fall through to the
+    // settings panel when there is nothing here to cancel.
     if (event.key === 'l' || event.key === 'L') { toggleLog(); return; }
     if (event.key === ' ') {
       event.preventDefault();
@@ -1056,11 +1053,20 @@ export function createHud(mount, {
   const detachPick = board ? null : null;
   const hooks = { onBoardPick, onBoardHover };
 
+  /** Back out of whatever is open. True if something was dismissed. */
+  function consumeEscape() {
+    if (promptOverlay) return true;   // discard and choose-Lord are not optional
+    if (inspector) { closeInspector(); return true; }
+    if (pending.length) { clearPending(); return true; }
+    return false;
+  }
+
   return {
     setView,
     setDeadline,
     toast,
     hooks,
+    consumeEscape,
     refreshGameplaySettings() {
       refreshHold();
       refreshBoardHighlights();

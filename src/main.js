@@ -432,16 +432,19 @@ function showDisconnected(reason) {
 // Global keys
 // ------------------------------------------------------------
 
+// W, A, S and D belong to the camera, so no panel is bound to a letter
+// the camera uses. Settings live on Escape instead.
 window.addEventListener('keydown', (event) => {
   if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
 
   if (event.key === 'Escape') {
     if (settingsOpen()) { closeSettings(); return; }
     if (howToPlayOpen()) { closeHowToPlay(); return; }
+    // Let the table back out of whatever it is in the middle of first;
+    // only open settings when there is nothing else to dismiss.
+    if (hud?.consumeEscape()) return;
+    showSettings();
     return;
-  }
-  if (event.key === 's' || event.key === 'S') {
-    if (settingsOpen()) closeSettings(); else showSettings();
   }
   if (event.key === 'h' || event.key === 'H') {
     if (howToPlayOpen()) closeHowToPlay(); else openHowToPlay();

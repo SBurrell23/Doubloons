@@ -415,8 +415,12 @@ function createCameraRig(camera, domElement, target, initial = {}) {
 
   const onContextMenu = (event) => { if (onCanvas(event)) event.preventDefault(); };
 
+  /** True while a modal panel is covering the table. */
+  const blocked = () => !!document.querySelector('.overlay');
+
   const onKeyDown = (event) => {
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+    if (blocked()) return;
     keys.add(event.code);
   };
   const onKeyUp = (event) => keys.delete(event.code);
@@ -445,6 +449,10 @@ function createCameraRig(camera, domElement, target, initial = {}) {
   }
 
   function update(dt) {
+    // A panel can open while a key is held, and the keyup then lands on
+    // the panel rather than here — so re-check every frame.
+    if (keys.size && blocked()) keys.clear();
+
     // Keyboard. Pan speed scales with distance so it feels the same
     // whether you are over the table or out at sea.
     if (state.enabled && keys.size) {

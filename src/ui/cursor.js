@@ -1,51 +1,40 @@
 // ============================================================
-// The pointer: a scimitar.
+// The pointer.
 //
-// Drawn as SVG and installed as a CSS cursor. The blade lies
-// along the same diagonal as the stock Windows arrow, with its
-// point at the top-left and the hotspot on that point, so it
-// aims exactly where the system cursor would.
+// The ordinary arrow everyone already knows how to read, struck
+// in gold. Same silhouette and same hotspot as the system
+// cursor, so it aims exactly where you expect.
 // ============================================================
 
-const TIP = { x: 3, y: 2.5 };
+// The classic arrow, tip at the top left.
+const ARROW = 'M2 1.6 L2 22.9 L7.5 17.6 L11.1 26 L15.1 24.2 L11.5 16.1 L18.4 16.1 Z';
+const TIP = { x: 2, y: 2 };
 
 /**
- * `variant` is 'default' for the plain steel blade or 'active' for the
- * gilded one used over anything clickable.
+ * `variant` is 'default' for the plain gold arrow or 'active' for the
+ * brighter one used over anything clickable.
  */
-function scimitarSvg(variant = 'default') {
+function arrowSvg(variant = 'default') {
   const active = variant === 'active';
-  const bladeLight = active ? '#fff3cf' : '#f3f7fa';
-  const bladeMid = active ? '#e8c463' : '#c9d6df';
-  const bladeDark = active ? '#a87c22' : '#8a9aa6';
-  const edge = '#17140f';
-  const hilt = active ? '#f0cd72' : '#c8a03f';
+  const light = active ? '#fff6d2' : '#f6dc93';
+  const mid = active ? '#f0c95c' : '#cfa236';
+  const dark = active ? '#b98a1c' : '#8a6414';
+  const edge = active ? '#3a2708' : '#241a10';
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="30" viewBox="0 0 26 30">
   <defs>
-    <linearGradient id="b" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="${bladeLight}"/>
-      <stop offset="0.55" stop-color="${bladeMid}"/>
-      <stop offset="1" stop-color="${bladeDark}"/>
+    <linearGradient id="g" x1="0" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="${light}"/>
+      <stop offset="0.45" stop-color="${mid}"/>
+      <stop offset="1" stop-color="${dark}"/>
     </linearGradient>
   </defs>
-  <g stroke="${edge}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
-    <!-- blade: a crescent tapering to the point at the top left -->
-    <path d="M${TIP.x} ${TIP.y}
-             C 11 3.6, 18.4 8.4, 22.4 16.6
-             C 17.6 14.2, 11.4 9.4, ${TIP.x} ${TIP.y} Z"
-          fill="url(#b)"/>
-    <!-- crossguard, square to the blade -->
-    <path d="M18.6 20.6 L25.6 13.6" stroke="${edge}" stroke-width="4.4"/>
-    <path d="M18.6 20.6 L25.6 13.6" stroke="${hilt}" stroke-width="2.4"/>
-    <!-- grip and pommel -->
-    <path d="M21.6 18.4 L27.8 24.6" stroke="${edge}" stroke-width="5"/>
-    <path d="M21.6 18.4 L27.8 24.6" stroke="#5a3d24" stroke-width="2.8"/>
-    <circle cx="29.2" cy="26" r="2.5" fill="${hilt}"/>
-  </g>
-  <!-- a glint on the flat of the blade -->
-  <path d="M7.4 5.2 C 12 6.6, 16.2 10, 19 14.4" fill="none"
-        stroke="#ffffff" stroke-opacity="${active ? 0.75 : 0.55}" stroke-width="1.3" stroke-linecap="round"/>
+  <!-- A dark casing under the fill keeps it legible on pale ground. -->
+  <path d="${ARROW}" fill="none" stroke="${edge}" stroke-width="3.4" stroke-linejoin="round"/>
+  <path d="${ARROW}" fill="url(#g)"/>
+  <!-- Bevel: a bright edge down the left, a shadow down the right. -->
+  <path d="M3.4 4.2 L3.4 19.4" fill="none" stroke="#fffaea" stroke-opacity="0.85" stroke-width="1.3" stroke-linecap="round"/>
+  <path d="M12.6 17.4 L15.6 24" fill="none" stroke="${dark}" stroke-opacity="0.75" stroke-width="1.2" stroke-linecap="round"/>
 </svg>`;
 }
 
@@ -56,11 +45,11 @@ function toDataUri(svg) {
 
 let styleNode = null;
 
-/** Install the scimitar cursor across the app. */
+/** Install the gold pointer across the app. */
 export function installCursor() {
   if (styleNode) return;
-  const plain = `${toDataUri(scimitarSvg('default'))} ${TIP.x} ${TIP.y}`;
-  const active = `${toDataUri(scimitarSvg('active'))} ${TIP.x} ${TIP.y}`;
+  const plain = `${toDataUri(arrowSvg('default'))} ${TIP.x} ${TIP.y}`;
+  const active = `${toDataUri(arrowSvg('active'))} ${TIP.x} ${TIP.y}`;
 
   styleNode = document.createElement('style');
   styleNode.textContent = `
