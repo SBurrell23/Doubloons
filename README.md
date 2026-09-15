@@ -63,7 +63,7 @@ Everything else is made at runtime.
 - **Sound** — every effect is synthesised with WebAudio oscillators and
   filtered noise. No sample files (`src/audio/sfx.js`).
 - **Icons** — hand-drawn SVG paths (`src/ui/icons.js`). No emoji.
-- **The cursor** — a scimitar, drawn as SVG (`src/ui/cursor.js`).
+- **The cursor** — a gold arrow, drawn as SVG (`src/ui/cursor.js`).
 
 ## Running it
 
@@ -136,18 +136,19 @@ balanced without a hand-typed table to get wrong.
 Left-drag slides the view across the island, right-drag (or shift-drag)
 swings it round, and the wheel moves in and out. `W A S D` or the arrow
 keys slide, `Q`/`E` swing, `+`/`-` zoom, and `Space` returns you to the
-table. The full list lives under Settings → Controls.
+table. No letter the camera uses is bound to a panel. The full list
+lives under Settings → Controls.
 
 ## Settings
 
-Reachable anywhere with the cog, <kbd>S</kbd>, or <kbd>Esc</kbd>.
+Reachable anywhere with the cog, or <kbd>Esc</kbd> when nothing else is open.
 
 - **Sound** — master, effects, music and ambience levels; mute
 - **Graphics** — frame cap, antialiasing, shadows, resolution scale,
   ocean detail, field of view, wildlife, FPS readout
 - **Gameplay** — tooltips, purchase confirmation, affordability
   highlighting, animation speed, colour-blind gem labels
-- **Controls** — drag and zoom sensitivity, invert, keyboard reference
+- **Controls** — the camera and keyboard reference
 
 Lobby options include the infamy target, a turn timer (which auto-plays
 a sensible move when it expires), AI speed, open holds, and a house rule

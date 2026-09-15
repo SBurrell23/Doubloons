@@ -46,20 +46,16 @@ const SKY_FRAG = /* glsl */`
   uniform vec3 sunColor;
   uniform vec3 sunDirection;
   uniform float offset;
+  // How fast the sky climbs out of the haze into blue. This is an
+  // exponent on a value under 1, so *larger* means a slower climb and
+  // a wider haze band — small values rush to blue right above the
+  // waterline and leave the horizon drawn as a line.
   uniform float exponent;
-  uniform vec3 glowColor;
-  uniform float glowStrength;
 
   void main() {
     float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
     float t = pow(max(h, 0.0), exponent);
     vec3 col = mix(horizonColor, topColor, t);
-
-    // A band of pale sea-green sitting right on the horizon, the way
-    // old sailors' tales have it. Tight enough to stay a glow rather
-    // than turning the whole sky green.
-    float band = exp(-pow(max(h, -0.02) * 15.0, 2.0));
-    col = mix(col, glowColor, band * glowStrength);
 
     // Sun disc and a soft bloom around it.
     float sun = max(dot(normalize(vWorldPosition), normalize(sunDirection)), 0.0);
@@ -84,9 +80,7 @@ function createSky(sunDirection) {
       sunColor: { value: new THREE.Color(0xfff4d0) },
       sunDirection: { value: sunDirection.clone().normalize() },
       offset: { value: 40 },
-      exponent: { value: 0.72 },
-      glowColor: { value: new THREE.Color(0x76dd9b) },
-      glowStrength: { value: 0.8 },
+      exponent: { value: 2.2 },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -152,11 +146,12 @@ function createClouds() {
 const OCEAN_SEGMENTS = { low: 64, medium: 128, high: 200 };
 
 /**
- * Distance haze. Shared by the fog, the sky's horizon band and the
- * clear colour so all three meet seamlessly. Kept saturated: a paler
- * blue tone-maps to grey and the horizon stops reading as sky.
+ * Distance haze — a pale sea-green, the colour of the old sailors'
+ * tales. The fog, the sky's horizon and the clear colour all use it,
+ * which is the whole trick: if the sea and the sky fade to the *same*
+ * colour there is nothing left to draw a horizon line with.
  */
-export const HAZE = 0x8dc3e8;
+export const HAZE = 0xa4d8c2;
 
 /** The seat at the table: what you play from. */
 export const TABLE_VIEW = { dist: 15, yaw: 0, pitch: 0.80 };
@@ -300,11 +295,6 @@ function createOcean(detail = 'high', shoreRadius = 26) {
         float shore = 1.0 - smoothstep(uShore * 0.72, uShore * 1.46, length(vWorldPos.xz));
         gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.30, 0.72, 0.70), shore * 0.62);
 
-        // Far water takes a little of the horizon's green, so the two
-        // meet in the same colour.
-        float far = smoothstep(120.0, 620.0, length(vWorldPos.xz - cameraPosition.xz));
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.46, 0.84, 0.62), far * 0.5);
-
         // Foam only where the swells genuinely pile up, and a fringe
         // where they run out over the shallows.
         float foam = smoothstep(0.78, 1.00, vCrest);
@@ -314,7 +304,7 @@ function createOcean(detail = 'high', shoreRadius = 26) {
         #include <fog_fragment>
       `);
   };
-  material.customProgramCacheKey = () => `ocean-v7-${detail}`;
+  material.customProgramCacheKey = () => `ocean-v8-${detail}`;
 
   const mesh = new THREE.Mesh(geo, material);
   mesh.position.y = -1.4;
@@ -566,7 +556,13 @@ export function createWorld(container, graphics = {}) {
   const settings = { ...DEFAULT_GRAPHICS, ...graphics };
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(HAZE, 60, 480);
+  // Exponential rather than linear: linear fog saturates at a fixed
+  // distance and leaves a flat slab of haze with a hard edge where the
+  // ocean plane ends. Exp2 never quite reaches full, so the water just
+  // dissolves. The density is set so the sea is gone by ~400 units
+  // while the island — 52 across, seen from at most 78 out — stays
+  // clear, with only a touch of aerial perspective on its far side.
+  scene.fog = new THREE.FogExp2(HAZE, 0.0045);
 
   const camera = new THREE.PerspectiveCamera(settings.fov, 1, 0.1, 2400);
 
