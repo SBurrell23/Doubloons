@@ -224,8 +224,12 @@
 
 /* Bonus tally — the headline number on each player card. */
 .bonus-tally {
+  /* Hugs its five squares instead of spanning the card, so the block
+     sits directly under the token pips rather than trailing a wide
+     empty shelf off to the right. */
+  display: inline-block;
   margin: 5px 0 6px;
-  padding: 4px 4px 5px;
+  padding: 3px 2px 4px;
   background: rgba(36, 24, 17, 0.14);
   border: 1px solid rgba(107, 82, 34, 0.4);
   border-radius: 3px;
@@ -237,20 +241,23 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  text-align: center;
+  text-align: left;
+  padding-left: 2px;
   margin-bottom: 3px;
 }
-/* Centred and capped: on a wide panel `flex: 1` alone stretched the
-   cells into letterboxes. */
-.bonus-tally__row { display: flex; gap: 3px; justify-content: center; }
+/* Sized to the token pips two rows up rather than to the panel: the
+   five squares start where the gems start and end where they end, so
+   the two rows read as one column of colours. `flex: 1` stretched them
+   into letterboxes on a wide card. */
+.bonus-tally__row { display: flex; gap: 3px; justify-content: flex-start; }
 /*
  * Outlined in the gem's own colour rather than filled with it, so a
  * bonus never gets mistaken for a token in hand two rows above.
  */
 .bonus-tally__cell {
-  flex: 1 1 0;
-  max-width: 42px;
-  height: 26px;
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
   display: grid;
   place-items: center;
   border: 2px solid var(--chip);
@@ -263,7 +270,7 @@
 .bonus-tally__n {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.84rem;
   line-height: 1;
   /* The deep cut of the gem colour, so every one of the five reads
      against the parchment. */
