@@ -427,7 +427,7 @@ export function openHowToPlay(initial = 'goal') {
   });
   const nextBtn = button('Next', { class: 'btn--gold', onClick: () => showIndex(index + 1) });
 
-  const modal = el('div.panel.modal.guide', { style: { '--modal-w': '780px' } },
+  const modal = el('div.panel.modal.guide', { style: { '--modal-w': '1060px' } },
     el('div.modal__head', {},
       el('div.grow', {},
         el('h2.panel__title', {}, 'How to Play'),

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>Doubloons!</title>
+  <!-- A struck doubloon: gold field, milled rim, skull and crossbones. -->
+  <defs>
+    <radialGradient id="field" cx="36%" cy="30%" r="72%">
+      <stop offset="0" stop-color="#ffeeb4"/>
+      <stop offset="0.52" stop-color="#e2b64c"/>
+      <stop offset="1" stop-color="#8f6314"/>
+    </radialGradient>
+  </defs>
+
+  <circle cx="32" cy="32" r="31" fill="url(#field)" stroke="#5c3e0c" stroke-width="2"/>
+  <circle cx="32" cy="32" r="26.5" fill="none" stroke="#fff0bd" stroke-width="1.6" opacity="0.8"/>
+  <circle cx="32" cy="32" r="23" fill="none" stroke="#7c5410" stroke-width="1.2" opacity="0.65"/>
+
+  <!-- crossed bones -->
+  <g stroke="#7c5410" stroke-width="6.4" stroke-linecap="round" opacity="0.95">
+    <path d="M17 47 L47 33"/>
+    <path d="M47 47 L17 33"/>
+  </g>
+  <g stroke="#fff1c4" stroke-width="4" stroke-linecap="round">
+    <path d="M17 47 L47 33"/>
+    <path d="M47 47 L17 33"/>
+  </g>
+
+  <!-- skull -->
+  <path d="M32 11
+           c-8.4 0-15.2 6.2-15.2 14 0 4.4 2.1 8.3 5.4 10.8v4.6
+           c0 2.3 1.9 4.2 4.2 4.2h11.2c2.3 0 4.2-1.9 4.2-4.2v-4.6
+           c3.3-2.5 5.4-6.4 5.4-10.8 0-7.8-6.8-14-15.2-14z"
+        fill="#fff3d2" stroke="#5c3e0c" stroke-width="2"/>
+  <circle cx="26.2" cy="24.6" r="4.4" fill="#4a3208"/>
+  <circle cx="37.8" cy="24.6" r="4.4" fill="#4a3208"/>
+  <path d="M32 30.2 L34.7 35.4 L29.3 35.4 Z" fill="#4a3208"/>
+  <g fill="#4a3208">
+    <rect x="26.4" y="38.4" width="2.6" height="4.6" rx="0.6"/>
+    <rect x="30.7" y="38.4" width="2.6" height="4.6" rx="0.6"/>
+    <rect x="35" y="38.4" width="2.6" height="4.6" rx="0.6"/>
+  </g>
+</svg>

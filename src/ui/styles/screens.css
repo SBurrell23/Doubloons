@@ -314,7 +314,19 @@
    Guide
    ------------------------------------------------------------ */
 
-.guide__body { max-height: min(60vh, 560px); padding-right: 0.6rem; }
+.guide__body { max-height: min(62vh, 620px); padding-right: 0.6rem; }
+/* Wide enough for the figure and the prose to sit side by side. */
+@media (min-width: 900px) {
+  .guide__page { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.6rem; align-items: start; }
+  .guide__page > .guide__heading { grid-column: 1 / -1; }
+  .guide__page > .guide__figure { grid-row: span 6; align-self: center; }
+  .guide__gems, .guide__table, .guide__callout { grid-column: 1 / -1; }
+}
+/* Slimmer tabs so all six sit on one row in the wide guide modal;
+   they still wrap gracefully if the window is genuinely narrow. */
+.guide .tabs { justify-content: center; }
+.guide .tab { padding: 0.55em 0.7em; letter-spacing: 0.07em; }
+.guide .tab .icon { margin-right: -0.1em; }
 .guide__page { animation: fade-in 0.16s ease; }
 .guide__heading {
   font-family: var(--font-display);

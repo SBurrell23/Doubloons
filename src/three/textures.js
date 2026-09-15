@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
 import { GEM_INFO, TIER_INFO } from '../game/data.js';
+import { drawCardArt } from './cardart/index.js';
 
 const noise = createNoise(20240714);
 const cache = new Map();
@@ -397,33 +398,13 @@ const TIER_ACCENT = { 1: '#6b8f3a', 2: '#2f6f96', 3: '#8d3a6b' };
 /**
  * A development card face. `card` is a card object from data.js.
  */
+/** Where a card's illustration lives on its face. */
+export const ART_PANEL = { x: 32, y: 194, w: 356, h: 198 };
+
 export function cardFaceCanvas(card) {
   const { el, ctx } = canvas(CARD_W, CARD_H);
   const info = GEM_INFO[card.bonus];
   parchment(ctx, CARD_W, CARD_H, card.id.length + card.points * 7);
-
-  // --- watermark: an engraved compass rose, well behind everything ---
-  ctx.save();
-  ctx.globalAlpha = 0.09;
-  ctx.strokeStyle = '#4a3016';
-  ctx.lineWidth = 4;
-  const wx = CARD_W / 2;
-  const wy = 400;
-  ctx.beginPath();
-  ctx.arc(wx, wy, 108, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(wx, wy, 76, 0, Math.PI * 2);
-  ctx.stroke();
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const long = i % 2 === 0 ? 132 : 92;
-    ctx.beginPath();
-    ctx.moveTo(wx, wy);
-    ctx.lineTo(wx + Math.cos(a) * long, wy + Math.sin(a) * long);
-    ctx.stroke();
-  }
-  ctx.restore();
 
   // --- border: a dark rule with a thin brass inner line ---
   ctx.strokeStyle = '#241a10';
@@ -491,56 +472,65 @@ export function cardFaceCanvas(card) {
   ctx.fillStyle = '#241a10';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontSize = card.name.length > 17 ? 30 : 35;
+  const fontSize = card.name.length > 19 ? 28 : 33;
   ctx.font = `600 ${fontSize}px Cinzel, Georgia, serif`;
-  wrapText(ctx, card.name, CARD_W / 2, 198, CARD_W - 64, fontSize + 8);
+  wrapText(ctx, card.name, CARD_W / 2, 166, CARD_W - 60, fontSize + 6);
 
-  // --- tier mark ---
-  ctx.strokeStyle = TIER_ACCENT[card.tier];
-  ctx.lineWidth = 3;
+  // --- illustration ---
+  const { x: ax, y: ay, w: aw, h: ah } = ART_PANEL;
+  ctx.save();
+  ctx.translate(ax, ay);
+  drawCardArt(ctx, card, aw, ah, info.ui);
+  ctx.restore();
+
+  // A hairline frame around the art, open at the top so it reads as
+  // part of the card rather than a pasted-in picture.
+  ctx.strokeStyle = 'rgba(74,58,40,0.45)';
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(CARD_W / 2 - 72, 254);
-  ctx.lineTo(CARD_W / 2 - 30, 254);
-  ctx.moveTo(CARD_W / 2 + 30, 254);
-  ctx.lineTo(CARD_W / 2 + 72, 254);
+  ctx.moveTo(ax, ay + ah);
+  ctx.lineTo(ax + aw, ay + ah);
   ctx.stroke();
-  ctx.fillStyle = TIER_ACCENT[card.tier];
-  for (let i = 0; i < card.tier; i++) {
-    ctx.save();
-    ctx.translate(CARD_W / 2 - (card.tier - 1) * 13 + i * 26, 254);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillRect(-7, -7, 14, 14);
-    ctx.restore();
-  }
 
-  // --- cost: a dark plaque down the left edge ---
+  // --- cost: a horizontal strip along the foot ---
+  // Laid across rather than stacked up the side, so a four-colour cost
+  // can never climb into the name or the header.
   const costs = Object.entries(card.cost).filter(([, n]) => n > 0);
-  const pipR = 33;
-  const step = pipR * 2 + 12;
-  const plaqueH = costs.length * step + 12;
-  const plaqueY = CARD_H - 32 - plaqueH;
-  const cx = 78;
+  const stripY = CARD_H - 154;
+  const stripH = 122;
 
   ctx.fillStyle = 'rgba(18,11,5,0.6)';
-  roundRect(ctx, 32, plaqueY, 156, plaqueH, 10);
+  roundRect(ctx, 30, stripY, CARD_W - 60, stripH, 10);
   ctx.fill();
   ctx.strokeStyle = 'rgba(176,141,69,0.7)';
   ctx.lineWidth = 3;
-  roundRect(ctx, 32, plaqueY, 156, plaqueH, 10);
+  roundRect(ctx, 30, stripY, CARD_W - 60, stripH, 10);
   ctx.stroke();
 
+  const cellW = (CARD_W - 60) / costs.length;
+  const pipR = Math.min(34, cellW * 0.32);
   costs.forEach(([gem, amount], i) => {
-    const cy = plaqueY + 12 + pipR + i * step;
-    drawGem(ctx, cx, cy, pipR, gem);
-    // The count sits beside the gem so it never fights the facets.
+    const cx = 30 + cellW * (i + 0.5);
+    drawGem(ctx, cx, stripY + 40, pipR, gem);
+
     ctx.fillStyle = '#fff3d6';
     ctx.strokeStyle = 'rgba(10,6,2,0.95)';
-    ctx.lineWidth = 7;
-    ctx.font = '700 46px Cinzel, Georgia, serif';
+    ctx.lineWidth = 6;
+    ctx.font = '700 42px Cinzel, Georgia, serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeText(String(amount), cx + pipR + 28, cy + 2);
-    ctx.fillText(String(amount), cx + pipR + 28, cy + 2);
+    ctx.strokeText(String(amount), cx, stripY + 92);
+    ctx.fillText(String(amount), cx, stripY + 92);
+
+    // A divider between cells.
+    if (i > 0) {
+      ctx.strokeStyle = 'rgba(176,141,69,0.35)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(30 + cellW * i, stripY + 14);
+      ctx.lineTo(30 + cellW * i, stripY + stripH - 14);
+      ctx.stroke();
+    }
   });
 
   return el;
@@ -729,3 +719,100 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 export { wrapText, roundRect, shade };
+
+// ------------------------------------------------------------
+// Doubloon faces
+// ------------------------------------------------------------
+
+/** Draw the struck design: a skull ringed by a beaded border. */
+function paintCoin(ctx, size, colours) {
+  const c = size / 2;
+  const r = size * 0.5;
+
+  ctx.fillStyle = colours.field;
+  ctx.beginPath();
+  ctx.arc(c, c, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Raised rim and the beading just inside it.
+  ctx.strokeStyle = colours.high;
+  ctx.lineWidth = size * 0.045;
+  ctx.beginPath();
+  ctx.arc(c, c, r * 0.94, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = colours.low;
+  ctx.lineWidth = size * 0.02;
+  ctx.beginPath();
+  ctx.arc(c, c, r * 0.82, 0, Math.PI * 2);
+  ctx.stroke();
+
+  for (let i = 0; i < 44; i++) {
+    const a = (i / 44) * Math.PI * 2;
+    ctx.fillStyle = i % 2 ? colours.high : colours.low;
+    ctx.beginPath();
+    ctx.arc(c + Math.cos(a) * r * 0.88, c + Math.sin(a) * r * 0.88, size * 0.014, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Skull in relief.
+  const s = size * 0.26;
+  ctx.fillStyle = colours.high;
+  ctx.beginPath();
+  ctx.arc(c, c - s * 0.16, s * 0.62, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillRect(c - s * 0.34, c + s * 0.3, s * 0.68, s * 0.42);
+
+  ctx.fillStyle = colours.deep;
+  ctx.beginPath();
+  ctx.arc(c - s * 0.26, c - s * 0.2, s * 0.2, 0, Math.PI * 2);
+  ctx.arc(c + s * 0.26, c - s * 0.2, s * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(c, c + s * 0.02);
+  ctx.lineTo(c + s * 0.13, c + s * 0.26);
+  ctx.lineTo(c - s * 0.13, c + s * 0.26);
+  ctx.closePath();
+  ctx.fill();
+  for (let i = -1; i <= 1; i++) {
+    ctx.fillRect(c + i * s * 0.22 - s * 0.035, c + s * 0.34, s * 0.07, s * 0.34);
+  }
+
+  // Crossed bones behind the jaw.
+  ctx.strokeStyle = colours.high;
+  ctx.lineWidth = size * 0.035;
+  ctx.lineCap = 'round';
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(c - dir * s * 0.95, c + s * 1.02);
+    ctx.lineTo(c + dir * s * 0.95, c + s * 0.6);
+    ctx.stroke();
+  }
+}
+
+/** The gold colour map for a doubloon. */
+export function coinFaceTexture(size = 256) {
+  return memo(`coinFace${size}`, () => {
+    const { el, ctx } = canvas(size, size);
+    ctx.clearRect(0, 0, size, size);
+    const grad = ctx.createRadialGradient(size * 0.36, size * 0.32, size * 0.05, size / 2, size / 2, size * 0.55);
+    grad.addColorStop(0, '#f8d97f');
+    grad.addColorStop(0.5, '#cd9a2c');
+    grad.addColorStop(1, '#7e5410');
+    const g = ctx.createLinearGradient(0, 0, 0, size);
+    g.addColorStop(0, '#f6d987');
+    g.addColorStop(1, '#b07f22');
+    paintCoin(ctx, size, { field: grad, high: '#f2cf6b', low: '#8a6118', deep: '#563a08' });
+    return finish(el, { aniso: 8 });
+  });
+}
+
+/** Height map for the same design, so the relief catches the light. */
+export function coinReliefTexture(size = 256) {
+  return memo(`coinRelief${size}`, () => {
+    const { el, ctx } = canvas(size, size);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, size, size);
+    paintCoin(ctx, size, { field: '#6e6e6e', high: '#ffffff', low: '#3a3a3a', deep: '#000000' });
+    return finish(el, { srgb: false });
+  });
+}

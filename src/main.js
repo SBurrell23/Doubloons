@@ -9,7 +9,7 @@ import './ui/styles/base.css';
 import './ui/styles/screens.css';
 import './ui/styles/game.css';
 
-import { createWorld } from './three/scene.js';
+import { createWorld, TABLE_VIEW, ISLAND_VIEW } from './three/scene.js';
 import { createBoard } from './three/board.js';
 import { createHud } from './ui/hud.js';
 import { renderTitle, renderLobby } from './ui/lobby.js';
@@ -19,6 +19,7 @@ import { installTooltips, setTooltipsEnabled } from './ui/tooltip.js';
 import { getSettings, updateSettings, onSettingsChange, applyAutoDetectOnce } from './ui/settings-store.js';
 import { el, clear, button } from './ui/dom.js';
 import { icon } from './ui/icons.js';
+import { installCursor } from './ui/cursor.js';
 import {
   initAudio, resumeAudio, applyAudioSettings, play,
   startAmbience, stopAmbience, ambienceRunning,
@@ -60,6 +61,7 @@ function bootProgress(pct, message) {
 
 async function start() {
   applyAutoDetectOnce();
+  installCursor();
   installTooltips();
   setTooltipsEnabled(settings.gameplay.tooltips);
   document.body.classList.toggle('cb-labels', settings.gameplay.colourblindLabels);
@@ -84,9 +86,8 @@ async function start() {
   await nextFrame();
 
   // Ease the camera in from a wide establishing shot.
-  world.rig.state.distance = 78;
-  world.rig.state.polar = 0.95;
-  world.rig.moveTo({ distance: 46, polar: 0.62 });
+  world.rig.moveTo({ dist: 74, pitch: 0.95, yaw: ISLAND_VIEW.yaw - 0.6, instant: true });
+  world.rig.moveTo(ISLAND_VIEW);
 
   applyGraphicsSettings(settings.graphics);
   showTitle();
@@ -98,7 +99,17 @@ async function start() {
   }, 300);
 }
 
-const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+/**
+ * Yield so the boot bar can paint. A hidden tab never fires
+ * requestAnimationFrame, so fall back to a timer — otherwise opening
+ * the game in a background tab would hang on the loading screen.
+ */
+const nextFrame = () => new Promise((resolve) => {
+  let settled = false;
+  const finish = () => { if (!settled) { settled = true; resolve(); } };
+  requestAnimationFrame(() => setTimeout(finish, 0));
+  setTimeout(finish, 150);
+});
 
 // ------------------------------------------------------------
 // Audio needs a gesture before it can make a sound
@@ -139,8 +150,7 @@ function applyAudio(audio) {
 }
 
 function applyControlSettings(controls) {
-  if (!world) return;
-  world.rig.sensitivity = controls;
+  world?.rig.setControls(controls);
 }
 
 function applyGameplay(gameplay) {
@@ -205,7 +215,7 @@ function showTitle() {
   clear(uiMount);
 
   world?.rig.setEnabled(true);
-  world?.rig.moveTo({ azimuth: Math.PI / 2, polar: 0.62, distance: 46 });
+  world?.rig.moveTo(ISLAND_VIEW);
 
   const params = new URLSearchParams(location.search);
   const joinCode = params.get('room') || params.get('r') || '';
@@ -285,7 +295,7 @@ function showLobby() {
   clear(uiMount);
 
   world?.rig.setEnabled(true);
-  world?.rig.moveTo({ azimuth: Math.PI / 2, polar: 0.66, distance: 34 });
+  world?.rig.moveTo({ ...ISLAND_VIEW, dist: 32 });
 
   lobbyUi = renderLobby(uiMount, session, {
     onStart: () => session.start(),
@@ -318,7 +328,7 @@ function showTable() {
   clear(uiMount);
 
   world.rig.setEnabled(true);
-  world.rig.moveTo({ azimuth: Math.PI / 2, polar: 0.72, distance: 15 });
+  world.rig.moveTo(TABLE_VIEW);
 
   // The board and the HUD are mutually dependent, so the board gets
   // lazy references and the HUD is built immediately after.

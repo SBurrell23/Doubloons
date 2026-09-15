@@ -328,7 +328,8 @@ body { touch-action: none; }
 
 /* Segmented choice */
 .segmented {
-  display: inline-flex;
+  display: flex;
+  justify-content: center;
   background: rgba(36, 24, 17, 0.16);
   border: 1px solid var(--brass-dark);
   border-radius: var(--radius);
@@ -336,6 +337,7 @@ body { touch-action: none; }
   gap: 2px;
   flex-wrap: wrap;
 }
+.segmented__option { flex: 1 1 auto; text-align: center; }
 .panel--dark .segmented { background: rgba(0, 0, 0, 0.3); }
 
 .segmented__option {

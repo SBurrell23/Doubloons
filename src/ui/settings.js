@@ -366,15 +366,21 @@ function gameplayTab(settings, patch) {
 }
 
 const SHORTCUTS = [
-  ['Drag', 'Swing the camera around the table'],
+  ['Drag', 'Slide the view across the island'],
+  ['Right-drag', 'Swing the camera around'],
+  ['Shift-drag', 'Swing the camera around'],
   ['Wheel / pinch', 'Move closer or further out'],
+  ['W A S D', 'Slide the view'],
+  ['Arrow keys', 'Slide the view'],
+  ['Q  /  E', 'Swing left or right'],
+  ['+  /  −', 'Zoom in or out'],
+  ['Space', 'Back to the table'],
   ['1 – 5', 'Take a gem of that colour'],
   ['Enter', 'Confirm the gems you have picked'],
   ['Esc', 'Cancel a pick, or close a panel'],
   ['S', 'Open these settings'],
   ['H', 'How to play'],
-  ['L', 'Toggle the event log'],
-  ['Space', 'Recentre the camera'],
+  ['L', 'Show or hide the log'],
 ];
 
 function controlsTab(settings, patch) {
@@ -410,7 +416,7 @@ function controlsTab(settings, patch) {
         onChange: (v) => patch('controls', { invertDrag: v }),
       }),
     ),
-    el('h3.settings__heading', {}, 'Keyboard'),
+    el('h3.settings__heading', {}, 'Camera & keys'),
     table,
   );
 }

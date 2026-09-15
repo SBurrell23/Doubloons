@@ -55,11 +55,15 @@ Everything else is made at runtime.
 
 - **Textures** — sand, wood, bark, rock, all ninety card faces and the
   Pirate Lord tiles are painted with Canvas2D (`src/three/textures.js`).
+- **Card art** — every one of the ninety cards has its own drawn
+  illustration, in an engraved-woodcut hand, as a Canvas2D function
+  (`src/three/cardart/`). No two are alike.
 - **Geometry** — the island, the palm, the crabs, the rocks, the chest
   and the cut gems are built from code (`src/three/props.js`).
 - **Sound** — every effect is synthesised with WebAudio oscillators and
   filtered noise. No sample files (`src/audio/sfx.js`).
 - **Icons** — hand-drawn SVG paths (`src/ui/icons.js`). No emoji.
+- **The cursor** — a scimitar, drawn as SVG (`src/ui/cursor.js`).
 
 ## Running it
 
@@ -126,6 +130,13 @@ Splendor's ninety cards are not arbitrary: each colour gets the same set
 of cost *shapes*, rotated around the five-colour ring. `data.js` encodes
 the shapes once and generates all ninety, which is why the economy is
 balanced without a hand-typed table to get wrong.
+
+## Moving the camera
+
+Left-drag slides the view across the island, right-drag (or shift-drag)
+swings it round, and the wheel moves in and out. `W A S D` or the arrow
+keys slide, `Q`/`E` swing, `+`/`-` zoom, and `Space` returns you to the
+table. The full list lives under Settings → Controls.
 
 ## Settings
 

@@ -59,6 +59,24 @@ class Tweens {
 
 const edgeMaterial = new THREE.MeshStandardMaterial({ color: 0xe8d9b4, roughness: 0.85 });
 
+/** A soft round dot, used for the glints above the gem dishes. */
+let sparkTexture = null;
+function getSparkTexture() {
+  if (sparkTexture) return sparkTexture;
+  const el = document.createElement('canvas');
+  el.width = el.height = 64;
+  const ctx = el.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.25, 'rgba(255,248,222,0.65)');
+  g.addColorStop(1, 'rgba(255,240,200,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  sparkTexture = new THREE.CanvasTexture(el);
+  sparkTexture.colorSpace = THREE.SRGBColorSpace;
+  return sparkTexture;
+}
+
 function cardGeometry() {
   return new THREE.BoxGeometry(CARD_W, CARD_T, CARD_H);
 }
@@ -283,7 +301,38 @@ export function createBoard(world, { onPick, onHover } = {}) {
       gems.push(mesh);
     }
 
-    tokenPiles[token] = { group, stack, gems, highlight, token, count: 0, material };
+    // Glints drifting over the heap. Cheap, and they do most of the
+    // work of making a pile of stones look precious.
+    const sparkCount = 7;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPos = new Float32Array(sparkCount * 3);
+    const sparkPhase = [];
+    for (let k = 0; k < sparkCount; k++) {
+      const a = (k / sparkCount) * Math.PI * 2 + 0.7;
+      const rad = 0.12 + (k % 3) * 0.13;
+      sparkPos[k * 3] = Math.cos(a) * rad;
+      sparkPos[k * 3 + 1] = 0.44 + (k % 4) * 0.07;
+      sparkPos[k * 3 + 2] = Math.sin(a) * rad;
+      sparkPhase.push(a * 1.7 + k);
+    }
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+    const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({
+      map: getSparkTexture(),
+      color: token === GOLD ? 0xfff0bc : 0xffffff,
+      size: 0.3,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    }));
+    sparks.visible = world.settings.sparkles !== false;
+    group.add(sparks);
+
+    tokenPiles[token] = {
+      group, stack, gems, highlight, token, count: 0, material,
+      sparks, sparkPhase, sparkBaseY: [...sparkPos].filter((_, i) => i % 3 === 1),
+    };
     const hit = new THREE.Mesh(
       new THREE.CylinderGeometry(0.6, 0.6, 1.1, 12),
       new THREE.MeshBasicMaterial({ visible: false }),
@@ -513,11 +562,13 @@ export function createBoard(world, { onPick, onHover } = {}) {
 
   let downPos = null;
   function handleDown(event) {
+    // Right and middle drag orbit the camera; they never pick.
+    if (event.button !== 0 || event.shiftKey) { downPos = null; return; }
     downPos = { x: event.clientX, y: event.clientY };
   }
 
   function handleUp(event) {
-    if (!downPos) return;
+    if (!downPos || event.button !== 0) return;
     const moved = Math.hypot(event.clientX - downPos.x, event.clientY - downPos.y);
     downPos = null;
     if (moved > 6) return;           // that was a camera drag
@@ -597,6 +648,22 @@ export function createBoard(world, { onPick, onHover } = {}) {
       const target = hoverKey ? 0.09 : 0;
       pile.stack.position.y += (target - pile.stack.position.y) * Math.min(1, dt * 12);
       pile.stack.rotation.y += dt * (hoverKey ? 0.9 : 0.12);
+
+      if (pile.sparks) {
+        const show = world.settings.sparkles !== false && pile.count > 0;
+        pile.sparks.visible = show;
+        if (show) {
+          const attr = pile.sparks.geometry.attributes.position;
+          for (let k = 0; k < pile.sparkPhase.length; k++) {
+            const ph = pile.sparkPhase[k];
+            attr.setY(k, pile.sparkBaseY[k] + Math.sin(time * 1.4 + ph) * 0.05);
+          }
+          attr.needsUpdate = true;
+          // Each glint winks in and out on its own clock.
+          pile.sparks.material.opacity =
+            (0.28 + Math.abs(Math.sin(time * 2.1 + pile.sparkPhase[0])) * 0.62) * (hoverKey ? 1 : 0.8);
+        }
+      }
     }
   }
 

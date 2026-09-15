@@ -76,14 +76,7 @@ export function createHud(mount, {
   const playersNode = el('div.players.scroll');
   const logList = el('div.log__list');
   const logNode = el('aside.log', {},
-    el('div.log__head', {},
-      el('span', {}, 'Ship’s Log'),
-      button(icon('minus', { size: '0.8rem' }), {
-        class: 'btn--ghost btn--sm',
-        'aria-label': 'Hide the log',
-        onClick: () => toggleLog(),
-      }),
-    ),
+    el('div.log__head', {}, el('span', {}, 'Ship’s Log')),
     logList,
   );
   const actionBar = el('div.action-bar', { hidden: true });
@@ -1054,7 +1047,8 @@ export function createHud(mount, {
     if (event.key === 'l' || event.key === 'L') { toggleLog(); return; }
     if (event.key === ' ') {
       event.preventDefault();
-      world.rig.moveTo({ azimuth: Math.PI / 2, polar: 0.72, distance: 15 });
+      world.rig.resetView();
+      toast('View recentred.', '', 1200);
     }
   }
   window.addEventListener('keydown', onKeyDown);

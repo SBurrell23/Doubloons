@@ -4,7 +4,10 @@
 
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
-import { sandTexture, sandBump, woodTexture, rockTexture, barkTexture } from './textures.js';
+import {
+  sandTexture, sandBump, woodTexture, rockTexture, barkTexture,
+  coinFaceTexture, coinReliefTexture,
+} from './textures.js';
 import { GEM_INFO } from '../game/data.js';
 
 const noise = createNoise(90210);
@@ -16,79 +19,130 @@ const noise = createNoise(90210);
 export function makeGemMaterial(gem, env) {
   const info = GEM_INFO[gem];
   if (gem === 'doubloon') {
+    // Struck gold. The relief map does the work; the environment only
+    // needs to supply highlights, not repaint the coin sky-blue.
     return new THREE.MeshStandardMaterial({
-      color: 0xf0c94e,
-      metalness: 0.92,
-      roughness: 0.26,
+      map: coinFaceTexture(),
+      bumpMap: coinReliefTexture(),
+      bumpScale: 0.03,
+      color: 0xffffff,
+      metalness: 0.72,
+      roughness: 0.34,
       envMap: env || null,
-      envMapIntensity: 2.0,
+      envMapIntensity: 0.8,
     });
   }
-  // Solid stones rather than glass: transmission washes the colour out
-  // at this size, and the facets carry the read instead. No emissive —
-  // it flattens exactly the facet-to-facet contrast we want.
+  // Cut stone rather than glass. Real transmission would need a render
+  // target per frame for forty-odd gems; a polished clearcoat over a
+  // saturated body reads the same at this size.
+  //
+  // Reflections stay deliberately modest: crank envMapIntensity or add
+  // sheen and the sky takes over the surface, turning every stone a
+  // pale pastel.
   return new THREE.MeshPhysicalMaterial({
     color: info.hex,
     metalness: 0,
-    roughness: 0.06,
-    clearcoat: 0.55,
-    clearcoatRoughness: 0.03,
-    reflectivity: 0.85,
+    roughness: 0.16,
+    clearcoat: 0.45,
+    clearcoatRoughness: 0.06,
+    reflectivity: 0.45,
+    // A low emissive anchors the hue so a stone still reads as its own
+    // colour on the facets that are pointing at the sun.
+    emissive: info.hex,
+    emissiveIntensity: 0.16,
+    // Just enough iridescence for the facets to throw a little fire.
+    iridescence: 0.12,
+    iridescenceIOR: 1.55,
+    iridescenceThicknessRange: [100, 380],
     envMap: env || null,
-    envMapIntensity: 1.15,
+    envMapIntensity: 0.7,
     flatShading: true,
   });
 }
 
 /**
- * A cut gem: a tall brilliant crown over a deep pavilion, meeting at
- * the girdle. Eight sides, flat shaded, so every facet reads.
+ * A round brilliant: table facet, a crown of star and bezel facets, a
+ * thin girdle band, and a pavilion running to the culet. Every facet
+ * is its own triangle, so flat shading gives each one its own
+ * highlight — which is the whole point of cutting a stone.
  */
-export function gemGeometry(radius = 1) {
-  const crownH = radius * 0.85;
-  const crown = new THREE.ConeGeometry(radius, crownH, 8, 1);
-  crown.translate(0, crownH / 2, 0);
-  // Flatten the apex into a table facet.
-  const cp = crown.attributes.position;
-  for (let i = 0; i < cp.count; i++) {
-    if (cp.getY(i) > crownH * 0.92) {
-      const a = Math.atan2(cp.getZ(i), cp.getX(i));
-      cp.setXYZ(i, Math.cos(a) * radius * 0.32, crownH * 0.66, Math.sin(a) * radius * 0.32);
+export function gemGeometry(radius = 1, sides = 12) {
+  const N = sides;
+  const tableR = radius * 0.54;
+  const tableY = radius * 0.44;
+  const girdleHi = radius * 0.03;
+  const girdleLo = -radius * 0.03;
+  const culetY = -radius * 1.02;
+
+  const ring = (r, y, offset) => Array.from({ length: N }, (_, i) => {
+    const a = ((i + offset) / N) * Math.PI * 2;
+    return [Math.cos(a) * r, y, Math.sin(a) * r];
+  });
+
+  const table = ring(tableR, tableY, 0);
+  // The girdle is rotated half a facet, which is what turns the crown
+  // into alternating triangles instead of a plain cone.
+  const gHi = ring(radius, girdleHi, 0.5);
+  const gLo = ring(radius, girdleLo, 0.5);
+  const culet = [0, culetY, 0];
+
+  const tris = [];
+  const push = (a, b, c) => tris.push(a, b, c);
+
+  // Table facet, as a fan.
+  for (let i = 1; i < N - 1; i++) push(table[0], table[i], table[i + 1]);
+
+  // Crown: bezel and star facets alternating around the ring.
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    push(table[i], table[j], gHi[i]);
+    push(table[j], gHi[j], gHi[i]);
+  }
+
+  // Girdle band.
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    push(gHi[i], gHi[j], gLo[i]);
+    push(gHi[j], gLo[j], gLo[i]);
+  }
+
+  // Pavilion, down to the culet.
+  for (let i = 0; i < N; i++) {
+    const j = (i + 1) % N;
+    push(gLo[j], gLo[i], culet);
+  }
+
+  const positions = new Float32Array(tris.length * 3);
+  tris.forEach((v, i) => {
+    positions[i * 3] = v[0];
+    positions[i * 3 + 1] = v[1];
+    positions[i * 3 + 2] = v[2];
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals();
+  geo.userData = { girdle: 0, tip: culetY };
+  return geo;
+}
+
+/** A doubloon: a milled disc, thick enough to read as struck metal. */
+export function coinGeometry(radius = 1) {
+  const geo = new THREE.CylinderGeometry(radius, radius, radius * 0.2, 32, 1);
+  // Mill the edge so it catches the light like a real coin rim.
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const d = Math.hypot(x, z);
+    if (d > radius * 0.92) {
+      const a = Math.atan2(z, x);
+      const mill = 1 + Math.sin(a * 24) * 0.012;
+      pos.setXYZ(i, Math.cos(a) * radius * mill, pos.getY(i), Math.sin(a) * radius * mill);
     }
   }
-
-  const pavH = radius * 1.1;
-  const pavilion = new THREE.ConeGeometry(radius, pavH, 8, 1);
-  pavilion.rotateX(Math.PI);
-  pavilion.translate(0, -pavH / 2, 0);
-
-  const merged = mergeGeometries([crown, pavilion]);
-  merged.computeVertexNormals();
-  // The girdle sits at y = 0; the tip reaches -1.1r.
-  merged.userData = { girdle: 0, tip: -pavH };
-  return merged;
-}
-
-/** Stitch a few BufferGeometries together without pulling in an addon. */
-function mergeGeometries(list) {
-  const positions = [];
-  const normals = [];
-  for (const geo of list) {
-    const nonIndexed = geo.index ? geo.toNonIndexed() : geo;
-    positions.push(...nonIndexed.attributes.position.array);
-    if (nonIndexed.attributes.normal) normals.push(...nonIndexed.attributes.normal.array);
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  if (normals.length === positions.length) {
-    out.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  }
-  return out;
-}
-
-/** A doubloon: a thick, slightly bevelled disc. */
-export function coinGeometry(radius = 1) {
-  return new THREE.CylinderGeometry(radius, radius, radius * 0.22, 20, 1);
+  geo.computeVertexNormals();
+  return geo;
 }
 
 // ------------------------------------------------------------

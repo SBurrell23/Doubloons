@@ -157,14 +157,14 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: clamp(206px, 18vw, 254px);
+  width: clamp(236px, 21vw, 306px);
   overflow-y: auto;
   max-height: 100%;
   padding-right: 2px;
 }
 
 .player-card {
-  padding: 0.5rem 0.6rem;
+  padding: 0.6rem 0.72rem;
   background: linear-gradient(180deg, rgba(233, 220, 189, 0.94), rgba(200, 180, 138, 0.94));
   border: 1px solid var(--brass-dark);
   border-radius: var(--radius);
@@ -180,7 +180,7 @@
 
 .player-card__head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
 .player-card__emblem {
-  width: 22px; height: 22px; flex: none;
+  width: 26px; height: 26px; flex: none;
   border-radius: 2px;
   display: grid; place-items: center;
   border: 1px solid var(--brass-deep);
@@ -188,7 +188,7 @@
 }
 .player-card__name {
   font-weight: 600;
-  font-size: 0.88rem;
+  font-size: 1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -213,28 +213,28 @@
 .player-card__score {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.22rem;
+  font-size: 1.45rem;
   line-height: 1;
   color: var(--wood-dark);
   min-width: 1.4ch;
   text-align: right;
 }
 
-.player-card__gems { display: flex; gap: 2px; flex-wrap: wrap; margin-bottom: 4px; }
+.player-card__gems { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px; }
 
 /* Bonus tally: a small stack of chips per colour */
 .bonus-tally { display: flex; gap: 3px; align-items: flex-end; margin-bottom: 4px; }
 .bonus-tally__col { display: flex; flex-direction: column-reverse; align-items: center; gap: 1px; }
 .bonus-tally__chip {
-  width: 14px; height: 4px;
+  width: 17px; height: 5px;
   background: var(--chip, #999);
   border: 1px solid rgba(36, 24, 17, 0.5);
 }
-.bonus-tally__count { font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-soft); }
+.bonus-tally__count { font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-soft); }
 
 .player-card__stat {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-  font-size: 0.7rem; color: var(--ink-soft); font-style: italic;
+  font-size: 0.78rem; color: var(--ink-soft); font-style: italic;
 }
 .player-card__stat .icon { opacity: 0.7; }
 
@@ -489,7 +489,7 @@
 
 .perf {
   position: fixed;
-  top: 8px; right: 8px;
+  bottom: 10px; right: 10px;
   z-index: 80;
   font-family: var(--font-mono);
   font-size: 10px;
@@ -507,7 +507,7 @@
    ------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .players { width: 166px; }
+  .players { width: 178px; }
   .log { display: none; }
 }
 

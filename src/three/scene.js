@@ -147,6 +147,11 @@ const OCEAN_SEGMENTS = { low: 64, medium: 128, high: 200 };
  */
 export const HAZE = 0x8dc3e8;
 
+/** The seat at the table: what you play from. */
+export const TABLE_VIEW = { dist: 15, yaw: 0, pitch: 0.80 };
+/** A wide establishing shot for the menus. */
+export const ISLAND_VIEW = { dist: 44, yaw: -0.5, pitch: 0.62 };
+
 /** Island radius. The water shader needs it to place the lagoon. */
 const ISLAND_RADIUS = 26;
 
@@ -302,124 +307,234 @@ function createOcean(detail = 'high', shoreRadius = 26) {
 }
 
 // ------------------------------------------------------------
-// Camera rig — orbit around the table, with limits
+// Camera rig — free roaming over the island.
+//
+// Left-drag pans, right-drag (or shift-drag) orbits, wheel zooms,
+// WASD/arrows pan and Q/E swing the view. Same feel as Colorado.
 // ------------------------------------------------------------
 
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
 function createCameraRig(camera, domElement, target, initial = {}) {
+  const home = target.clone();
+
   const state = {
     target: target.clone(),
-    azimuth: initial.azimuth ?? Math.PI / 2,
-    polar: initial.polar ?? 0.72,
-    distance: initial.distance ?? 15,
-    minDistance: 9,
-    maxDistance: 78,
-    minPolar: 0.10,
-    maxPolar: 1.30,
+    goalTarget: target.clone(),
+    yaw: initial.yaw ?? 0,
+    goalYaw: initial.yaw ?? 0,
+    pitch: initial.pitch ?? 0.80,
+    goalPitch: initial.pitch ?? 0.80,
+    dist: initial.dist ?? 15,
+    goalDist: initial.dist ?? 15,
+    minDist: 5,
+    maxDist: 78,
+    minPitch: 0.10,
+    maxPitch: 1.42,
+    // How far from the table the view may wander before it is reined in.
+    panRadius: 26,
     enabled: true,
   };
 
-  const desired = { azimuth: state.azimuth, polar: state.polar, distance: state.distance };
-  let dragging = false;
-  let lastX = 0, lastY = 0;
-  let pointers = new Map();
-  let pinchStart = 0;
+  const homeView = { dist: state.dist, yaw: state.yaw, pitch: state.pitch };
+  let controls = { dragSensitivity: 1, zoomSensitivity: 1, invertDrag: false };
 
-  const onPointerDown = (e) => {
-    if (!state.enabled) return;
-    // Ignore drags that begin on HUD elements layered over the canvas.
-    if (e.target !== domElement && !(e.target instanceof HTMLCanvasElement)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) {
-      dragging = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-    } else if (pointers.size === 2) {
-      const [a, b] = [...pointers.values()];
-      pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
+  const keys = new Set();
+  const pointers = new Map();
+  let mode = null;
+  let last = null;
+  let moved = 0;
+  let pinchDist = 0;
+
+  // ---- input ----
+
+  const onCanvas = (event) => event.target instanceof HTMLCanvasElement;
+
+  const onPointerDown = (event) => {
+    if (!state.enabled || !onCanvas(event)) return;
+    if (event.target.setPointerCapture) {
+      try { event.target.setPointerCapture(event.pointerId); } catch { /* not capturable */ }
     }
-  };
-
-  const onPointerMove = (e) => {
-    if (!pointers.has(e.pointerId)) return;
-    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    moved = 0;
+    mode = (event.button === 2 || event.button === 1 || event.shiftKey) ? 'orbit' : 'pan';
+    last = { x: event.clientX, y: event.clientY };
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
-      const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchStart > 0) {
-        desired.distance = clamp(desired.distance * (pinchStart / dist), state.minDistance, state.maxDistance);
-      }
-      pinchStart = dist;
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      mode = 'pinch';
+    }
+  };
+
+  const onPointerMove = (event) => {
+    if (pointers.has(event.pointerId)) {
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    }
+    if (!state.enabled || !last || !mode) return;
+
+    if (mode === 'pinch' && pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist) state.goalDist = clamp(state.goalDist * (pinchDist / d), state.minDist, state.maxDist);
+      pinchDist = d;
       return;
     }
-    if (!dragging || !state.enabled) return;
-    const dx = e.clientX - lastX;
-    const dy = e.clientY - lastY;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    desired.azimuth -= dx * 0.005;
-    desired.polar = clamp(desired.polar - dy * 0.004, state.minPolar, state.maxPolar);
+
+    const invert = controls.invertDrag ? -1 : 1;
+    const dx = (event.clientX - last.x) * controls.dragSensitivity * invert;
+    const dy = (event.clientY - last.y) * controls.dragSensitivity * invert;
+    last = { x: event.clientX, y: event.clientY };
+    moved += Math.abs(dx) + Math.abs(dy);
+
+    if (mode === 'orbit') {
+      state.goalYaw -= dx * 0.005;
+      state.goalPitch = clamp(state.goalPitch + dy * 0.004, state.minPitch, state.maxPitch);
+    } else {
+      // Drag the ground: the table should stay under the cursor.
+      const speed = state.dist * 0.0016;
+      const right = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+      const fwd = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+      state.goalTarget.addScaledVector(right, -dx * speed);
+      state.goalTarget.addScaledVector(fwd, -dy * speed);
+      clampTarget();
+    }
   };
 
-  const onPointerUp = (e) => {
-    pointers.delete(e.pointerId);
-    if (pointers.size < 2) pinchStart = 0;
-    if (pointers.size === 0) dragging = false;
+  const onPointerUp = (event) => {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) pinchDist = 0;
+    if (pointers.size === 0) { mode = null; last = null; }
   };
 
-  const onWheel = (e) => {
-    if (!state.enabled) return;
-    e.preventDefault();
-    desired.distance = clamp(desired.distance * (1 + Math.sign(e.deltaY) * 0.09), state.minDistance, state.maxDistance);
+  const onWheel = (event) => {
+    if (!state.enabled || !onCanvas(event)) return;
+    event.preventDefault();
+    const step = (event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY) * controls.zoomSensitivity;
+    state.goalDist = clamp(state.goalDist * Math.pow(1.0016, step), state.minDist, state.maxDist);
   };
+
+  const onContextMenu = (event) => { if (onCanvas(event)) event.preventDefault(); };
+
+  const onKeyDown = (event) => {
+    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+    keys.add(event.code);
+  };
+  const onKeyUp = (event) => keys.delete(event.code);
+  const onBlur = () => { keys.clear(); pointers.clear(); mode = null; last = null; };
 
   domElement.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerUp);
   domElement.addEventListener('wheel', onWheel, { passive: false });
+  domElement.addEventListener('contextmenu', onContextMenu);
+  window.addEventListener('keydown', onKeyDown);
+  window.addEventListener('keyup', onKeyUp);
+  window.addEventListener('blur', onBlur);
 
-  const targetTarget = state.target.clone();
+  function clampTarget() {
+    const dx = state.goalTarget.x - home.x;
+    const dz = state.goalTarget.z - home.z;
+    const d = Math.hypot(dx, dz);
+    if (d > state.panRadius) {
+      const k = state.panRadius / d;
+      state.goalTarget.x = home.x + dx * k;
+      state.goalTarget.z = home.z + dz * k;
+    }
+    state.goalTarget.y = home.y;
+  }
 
   function update(dt) {
-    const ease = 1 - Math.pow(0.0015, dt);
-    state.azimuth += (desired.azimuth - state.azimuth) * ease;
-    state.polar += (desired.polar - state.polar) * ease;
-    state.distance += (desired.distance - state.distance) * ease;
-    state.target.lerp(targetTarget, ease);
+    // Keyboard. Pan speed scales with distance so it feels the same
+    // whether you are over the table or out at sea.
+    if (state.enabled && keys.size) {
+      const pan = state.dist * 0.9 * dt;
+      const right = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
+      const fwd = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
+      if (keys.has('KeyW') || keys.has('ArrowUp')) state.goalTarget.addScaledVector(fwd, -pan);
+      if (keys.has('KeyS') || keys.has('ArrowDown')) state.goalTarget.addScaledVector(fwd, pan);
+      if (keys.has('KeyA') || keys.has('ArrowLeft')) state.goalTarget.addScaledVector(right, -pan);
+      if (keys.has('KeyD') || keys.has('ArrowRight')) state.goalTarget.addScaledVector(right, pan);
+      if (keys.has('KeyQ')) state.goalYaw += dt * 1.1;
+      if (keys.has('KeyE')) state.goalYaw -= dt * 1.1;
+      if (keys.has('Equal') || keys.has('NumpadAdd')) {
+        state.goalDist = clamp(state.goalDist * (1 - dt), state.minDist, state.maxDist);
+      }
+      if (keys.has('Minus') || keys.has('NumpadSubtract')) {
+        state.goalDist = clamp(state.goalDist * (1 + dt), state.minDist, state.maxDist);
+      }
+      clampTarget();
+    }
 
-    const sinPolar = Math.sin(state.polar);
+    const s = 1 - Math.pow(0.0015, dt);
+    state.target.lerp(state.goalTarget, s);
+    state.dist += (state.goalDist - state.dist) * s;
+    state.yaw += (state.goalYaw - state.yaw) * s;
+    state.pitch += (state.goalPitch - state.pitch) * s;
+
+    const cp = Math.cos(state.pitch);
     camera.position.set(
-      state.target.x + state.distance * sinPolar * Math.cos(state.azimuth),
-      state.target.y + state.distance * Math.cos(state.polar),
-      state.target.z + state.distance * sinPolar * Math.sin(state.azimuth),
+      state.target.x + Math.sin(state.yaw) * cp * state.dist,
+      state.target.y + Math.sin(state.pitch) * state.dist,
+      state.target.z + Math.cos(state.yaw) * cp * state.dist,
     );
     camera.lookAt(state.target);
   }
 
   return {
     state,
-    desired,
     update,
-    setTarget(v) { targetTarget.copy(v); },
-    moveTo({ azimuth, polar, distance }) {
-      if (azimuth !== undefined) desired.azimuth = azimuth;
-      if (polar !== undefined) desired.polar = clamp(polar, state.minPolar, state.maxPolar);
-      if (distance !== undefined) desired.distance = clamp(distance, state.minDistance, state.maxDistance);
+    /** Where "reset view" sends the camera. */
+    setHome(v, view = {}) {
+      home.copy(v);
+      state.goalTarget.copy(v);
+      if (view.dist !== undefined) homeView.dist = view.dist;
+      if (view.yaw !== undefined) homeView.yaw = view.yaw;
+      if (view.pitch !== undefined) homeView.pitch = view.pitch;
     },
-    setEnabled(v) { state.enabled = v; if (!v) { dragging = false; pointers.clear(); } },
-    isDragging: () => dragging,
+    resetView(instant = false) {
+      state.goalTarget.copy(home);
+      state.goalDist = clamp(homeView.dist, state.minDist, state.maxDist);
+      state.goalYaw = homeView.yaw;
+      state.goalPitch = clamp(homeView.pitch, state.minPitch, state.maxPitch);
+      if (instant) {
+        state.target.copy(state.goalTarget);
+        state.dist = state.goalDist;
+        state.yaw = state.goalYaw;
+        state.pitch = state.goalPitch;
+      }
+    },
+    moveTo({ yaw, pitch, dist, target, instant = false } = {}) {
+      if (yaw !== undefined) state.goalYaw = yaw;
+      if (pitch !== undefined) state.goalPitch = clamp(pitch, state.minPitch, state.maxPitch);
+      if (dist !== undefined) state.goalDist = clamp(dist, state.minDist, state.maxDist);
+      if (target) { state.goalTarget.copy(target); clampTarget(); }
+      if (instant) {
+        state.target.copy(state.goalTarget);
+        state.dist = state.goalDist;
+        state.yaw = state.goalYaw;
+        state.pitch = state.goalPitch;
+      }
+    },
+    setControls(next) { controls = { ...controls, ...next }; },
+    setEnabled(v) {
+      state.enabled = v;
+      if (!v) { pointers.clear(); mode = null; last = null; keys.clear(); }
+    },
+    isDragging: () => !!mode && moved > 4,
     dispose() {
       domElement.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('pointercancel', onPointerUp);
       domElement.removeEventListener('wheel', onWheel);
+      domElement.removeEventListener('contextmenu', onContextMenu);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     },
   };
 }
-
-const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 // ------------------------------------------------------------
 // World
@@ -448,6 +563,9 @@ export function createWorld(container, graphics = {}) {
     next.toneMappingExposure = 1.02;
     next.shadowMap.enabled = settings.shadows !== 'off';
     next.shadowMap.type = settings.shadows === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    // The scene barely moves, so the depth map does not need redrawing
+    // every frame; the loop refreshes it on a slower beat.
+    next.shadowMap.autoUpdate = false;
     next.setClearColor(HAZE, 1);
     next.domElement.classList.add('game-canvas');
     return next;
@@ -462,10 +580,10 @@ export function createWorld(container, graphics = {}) {
   const sun = new THREE.DirectionalLight(0xfff3d6, 2.1);
   sun.position.copy(sunDirection).multiplyScalar(90);
   sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.mapSize.set(1536, 1536);
   sun.shadow.camera.near = 20;
   sun.shadow.camera.far = 200;
-  const extent = 32;
+  const extent = 19;
   sun.shadow.camera.left = -extent;
   sun.shadow.camera.right = extent;
   sun.shadow.camera.top = extent;
@@ -592,8 +710,8 @@ export function createWorld(container, graphics = {}) {
   // Aim a little forward of the board's centre: the gem dishes sit at
   // the near edge and would otherwise hide behind the action bar.
   const focus = boardAnchor.position.clone().add(new THREE.Vector3(0, 0, 0.9));
-  camera.position.set(0, focus.y + 11, 16);
-  let rig = createCameraRig(camera, container, focus);
+  const rig = createCameraRig(camera, container, focus, TABLE_VIEW);
+  rig.setHome(focus, TABLE_VIEW);
 
   // --- loop ---
   const clock = new THREE.Clock();
@@ -603,7 +721,13 @@ export function createWorld(container, graphics = {}) {
   const frameCallbacks = new Set();
   const stats = { fps: 0, frames: 0, lastSample: 0, drawCalls: 0, triangles: 0 };
 
+  let shadowTick = 0;
   function renderFrame(dt, time) {
+    // Crabs scuttle and fronds sway, so the map does want refreshing —
+    // just not sixty times a second.
+    if (settings.shadows !== 'off' && (shadowTick++ % 4 === 0)) {
+      renderer.shadowMap.needsUpdate = true;
+    }
     ocean.userData.uniforms.uTime.value = time;
     palm.userData.sway(time, 1);
     clouds.userData.update(time);
@@ -695,8 +819,10 @@ export function createWorld(container, graphics = {}) {
 
     renderer.shadowMap.enabled = settings.shadows !== 'off';
     renderer.shadowMap.type = settings.shadows === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+    renderer.shadowMap.autoUpdate = false;
     sun.castShadow = settings.shadows !== 'off';
-    sun.shadow.mapSize.set(settings.shadows === 'high' ? 2048 : 1024, settings.shadows === 'high' ? 2048 : 1024);
+    const shadowRes = settings.shadows === 'high' ? 1536 : 1024;
+    sun.shadow.mapSize.set(shadowRes, shadowRes);
     if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
     scene.traverse((o) => { if (o.material) o.material.needsUpdate = true; });
 
