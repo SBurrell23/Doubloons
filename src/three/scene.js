@@ -80,7 +80,7 @@ function createSky(sunDirection) {
       sunColor: { value: new THREE.Color(0xfff4d0) },
       sunDirection: { value: sunDirection.clone().normalize() },
       offset: { value: 40 },
-      exponent: { value: 2.2 },
+      exponent: { value: 3.0 },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -559,10 +559,11 @@ export function createWorld(container, graphics = {}) {
   // Exponential rather than linear: linear fog saturates at a fixed
   // distance and leaves a flat slab of haze with a hard edge where the
   // ocean plane ends. Exp2 never quite reaches full, so the water just
-  // dissolves. The density is set so the sea is gone by ~400 units
-  // while the island — 52 across, seen from at most 78 out — stays
-  // clear, with only a touch of aerial perspective on its far side.
-  scene.fog = new THREE.FogExp2(HAZE, 0.0045);
+  // dissolves. Tuned so the sea is gone by ~350 units while the island
+  // — 52 across, seen from at most 78 out — stays clear: about 2% haze
+  // at its own edge, rising to a little aerial perspective on the far
+  // rim at full zoom-out.
+  scene.fog = new THREE.FogExp2(HAZE, 0.0056);
 
   const camera = new THREE.PerspectiveCamera(settings.fov, 1, 0.1, 2400);
 

@@ -240,13 +240,16 @@
   text-align: center;
   margin-bottom: 3px;
 }
-.bonus-tally__row { display: flex; gap: 3px; }
+/* Centred and capped: on a wide panel `flex: 1` alone stretched the
+   cells into letterboxes. */
+.bonus-tally__row { display: flex; gap: 3px; justify-content: center; }
 /*
  * Outlined in the gem's own colour rather than filled with it, so a
  * bonus never gets mistaken for a token in hand two rows above.
  */
 .bonus-tally__cell {
-  flex: 1;
+  flex: 1 1 0;
+  max-width: 42px;
   height: 26px;
   display: grid;
   place-items: center;
