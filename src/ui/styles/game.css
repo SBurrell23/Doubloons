@@ -157,7 +157,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: clamp(236px, 21vw, 306px);
+  /* Sized to the widest thing on a card — the five bonus squares at
+     35px with 3px gaps — so no card trails an empty shelf on a big
+     screen. */
+  width: 222px;
   overflow-y: auto;
   max-height: 100%;
   padding-right: 2px;
@@ -178,7 +181,9 @@
 }
 .player-card--winner { box-shadow: var(--shadow-soft), inset 0 0 0 2px var(--brass-bright); }
 
-.player-card__head { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem; }
+/* Tight gaps: the card is only as wide as the bonus row now, so the
+   header has to fit a name, a badge and a score inside 195px. */
+.player-card__head { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.4rem; }
 .player-card__emblem {
   width: 26px; height: 26px; flex: none;
   border-radius: 2px;
@@ -188,7 +193,7 @@
 }
 .player-card__name {
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.95rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -224,9 +229,6 @@
 
 /* Bonus tally — the headline number on each player card. */
 .bonus-tally {
-  /* 70% of the card: at full width the cells stretched into letterboxes
-     on a desktop-sized panel. Block-level, so it sits flush left. */
-  width: 70%;
   margin: 5px 0 6px;
   padding: 4px 4px 5px;
   background: rgba(36, 24, 17, 0.14);
@@ -556,9 +558,6 @@
 @media (max-width: 900px) {
   .players { width: 178px; }
   .log { display: none; }
-  /* The narrow panel has no width to give away — the 70% trim above is
-     for desktop-sized cards. */
-  .bonus-tally { width: 100%; }
 }
 
 @media (max-width: 640px) {
