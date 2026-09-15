@@ -299,7 +299,7 @@ body { touch-action: none; }
    Form controls
    ------------------------------------------------------------ */
 
-.field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.15rem; text-align: center; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.15rem; align-items: flex-start; }
 .field__label {
   font-family: var(--font-display);
   font-weight: 600;
@@ -328,8 +328,7 @@ body { touch-action: none; }
 
 /* Segmented choice */
 .segmented {
-  display: flex;
-  justify-content: center;
+  display: inline-flex;
   background: rgba(36, 24, 17, 0.16);
   border: 1px solid var(--brass-dark);
   border-radius: var(--radius);
@@ -337,7 +336,6 @@ body { touch-action: none; }
   gap: 2px;
   flex-wrap: wrap;
 }
-.segmented__option { flex: 1 1 auto; text-align: center; }
 .panel--dark .segmented { background: rgba(0, 0, 0, 0.3); }
 
 .segmented__option {
@@ -403,10 +401,8 @@ body { touch-action: none; }
 .toggle {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.7rem;
   cursor: pointer;
-  padding: 0.25rem 0;
 }
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle__track {
@@ -423,7 +419,9 @@ body { touch-action: none; }
 .toggle__track::after {
   content: '';
   position: absolute;
-  top: 3px; left: 3px;
+  top: 50%;
+  left: 3px;
+  transform: translateY(-50%);
   width: 26px; height: 22px;
   border-radius: 2px;
   background:
@@ -432,17 +430,15 @@ body { touch-action: none; }
   border: 1px solid var(--brass-deep);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   transition: transform 0.18s cubic-bezier(0.3, 1.2, 0.5, 1);
+  will-change: transform;
 }
 .toggle input:checked + .toggle__track {
   background: linear-gradient(180deg, #2f6b57, var(--verdigris));
   border-color: var(--verdigris-bright);
 }
-.toggle input:checked + .toggle__track::after { transform: translateX(30px); }
+.toggle input:checked + .toggle__track::after { transform: translateY(-50%) translateX(26px); }
 .toggle input:focus-visible + .toggle__track { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
-.toggle__label {
-  font-size: 0.95rem;
-  min-width: 11ch;
-}
+.toggle__label { font-size: 0.95rem; }
 
 /* ------------------------------------------------------------
    Gem chips — the shared currency display
