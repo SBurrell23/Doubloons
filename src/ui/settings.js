@@ -382,9 +382,7 @@ const SHORTCUTS = [
   ['L', 'Show or hide the log'],
 ];
 
-function controlsTab(settings, patch) {
-  const c = settings.controls;
-
+function controlsTab() {
   const table = el('div.shortcuts');
   for (const [key, what] of SHORTCUTS) {
     table.append(el('div.shortcuts__row', {},
@@ -392,29 +390,9 @@ function controlsTab(settings, patch) {
       el('span.shortcuts__what', {}, what),
     ));
   }
-
   return el('div.settings__tab', {},
-    field('Drag sensitivity',
-      slider({
-        value: c.dragSensitivity, min: 0.4, max: 2, step: 0.05, format: (v) => `${v.toFixed(2)}×`,
-        label: 'Drag sensitivity',
-        onInput: (v) => patch('controls', { dragSensitivity: v }),
-      }),
-    ),
-    field('Zoom sensitivity',
-      slider({
-        value: c.zoomSensitivity, min: 0.4, max: 2, step: 0.05, format: (v) => `${v.toFixed(2)}×`,
-        label: 'Zoom sensitivity',
-        onInput: (v) => patch('controls', { zoomSensitivity: v }),
-      }),
-    ),
-    field('Invert drag',
-      toggle({
-        value: c.invertDrag,
-        label: 'Reverse the camera drag direction',
-        onChange: (v) => patch('controls', { invertDrag: v }),
-      }),
-    ),
+    el('p.field__hint.center', {},
+      'The camera moves at one fixed, brisk pace — there is nothing to tune.'),
     el('h3.settings__heading', {}, 'Camera & keys'),
     table,
   );

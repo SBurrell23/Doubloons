@@ -75,7 +75,6 @@ async function start() {
   await nextFrame();
 
   world = createWorld(sceneMount, settings.graphics);
-  applyControlSettings(settings.controls);
 
   bootProgress(60, 'Burying the treasure…');
   await nextFrame();
@@ -86,7 +85,7 @@ async function start() {
   await nextFrame();
 
   // Ease the camera in from a wide establishing shot.
-  world.rig.moveTo({ dist: 74, pitch: 0.95, yaw: ISLAND_VIEW.yaw - 0.6, instant: true });
+  world.rig.moveTo({ dist: 56, pitch: 0.9, yaw: ISLAND_VIEW.yaw - 0.55, instant: true });
   world.rig.moveTo(ISLAND_VIEW);
 
   applyGraphicsSettings(settings.graphics);
@@ -149,10 +148,6 @@ function applyAudio(audio) {
   else if (audioReady && !ambienceRunning()) startAmbience();
 }
 
-function applyControlSettings(controls) {
-  world?.rig.setControls(controls);
-}
-
 function applyGameplay(gameplay) {
   setTooltipsEnabled(gameplay.tooltips);
   document.body.classList.toggle('cb-labels', gameplay.colourblindLabels);
@@ -162,7 +157,6 @@ function applyGameplay(gameplay) {
 onSettingsChange((all, patch) => {
   if (patch.graphics) applyGraphicsSettings(all.graphics);
   if (patch.audio) applyAudio(all.audio);
-  if (patch.controls) applyControlSettings(all.controls);
   if (patch.gameplay) applyGameplay(all.gameplay);
 });
 
@@ -189,7 +183,6 @@ const settingsHooks = {
   onGraphics: applyGraphicsSettings,
   onAudio: applyAudio,
   onGameplay: applyGameplay,
-  onControls: applyControlSettings,
 };
 
 function showSettings(tab = 'sound') {
@@ -295,7 +288,7 @@ function showLobby() {
   clear(uiMount);
 
   world?.rig.setEnabled(true);
-  world?.rig.moveTo({ ...ISLAND_VIEW, dist: 32 });
+  world?.rig.moveTo({ ...ISLAND_VIEW, dist: 26 });
 
   lobbyUi = renderLobby(uiMount, session, {
     onStart: () => session.start(),

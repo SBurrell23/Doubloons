@@ -57,14 +57,11 @@ export function renderTitle(mount, {
   const screen = el('div.screen.screen--title', {},
     el('div.title__plate', {},
       el('div.title__crest', {}, icon('skull', { size: '2.6rem' })),
-      el('h1.title__logo', {}, 'Doubloons'),
+      el('h1.title__logo', {}, el('span', {}, 'Doubloons')),
       el('div.title__hairline'),
       el('p.title__tag', {}, 'Gems, galleons and a reputation worth hanging for.'),
 
-      el('div.title__name-row', {},
-        el('label.title__name-label', { for: nameInput.id = 'captain-name' }, 'Captain'),
-        nameInput,
-      ),
+      el('div.title__name-row', {}, nameInput),
 
       el('div.title__actions', {},
         button([icon('cutlasses'), 'Play the Crew'], {
@@ -259,78 +256,104 @@ export function renderLobby(mount, session, {
     }
   }
 
-  function renderOptions(lobby) {
+  // The options pane is built once and then updated in place. Rebuilding
+  // it on every lobby message would destroy whatever control the host is
+  // currently dragging — which is exactly what happened to the slider.
+  let optionControls = null;
+
+  function buildOptions(lobby) {
     clear(optionsPane);
     const opts = lobby.options;
 
     if (!session.isHost) {
-      const readonly = el('dl.lobby__readonly', {},
-        el('dt', {}, 'Infamy to win'), el('dd', {}, String(opts.targetPoints)),
-        el('dt', {}, 'Turn timer'), el('dd', {}, opts.turnTimer ? `${opts.turnTimer}s` : 'Off'),
-        el('dt', {}, 'Crew speed'), el('dd', {}, opts.aiSpeed),
-        el('dt', {}, 'Open holds'), el('dd', {}, opts.revealReserved ? 'Yes' : 'No'),
-        el('dt', {}, 'Extra doubloons'), el('dd', {}, String(opts.extraGold)),
-      );
+      const values = {
+        target: el('dd'), timer: el('dd'), speed: el('dd'),
+        holds: el('dd'), gold: el('dd'),
+      };
       optionsPane.append(
         el('p.lobby__note', {}, 'The host sets the rules for this table.'),
-        readonly,
+        el('dl.lobby__readonly', {},
+          el('dt', {}, 'Infamy to win'), values.target,
+          el('dt', {}, 'Turn timer'), values.timer,
+          el('dt', {}, 'Crew speed'), values.speed,
+          el('dt', {}, 'Open holds'), values.holds,
+          el('dt', {}, 'Extra doubloons'), values.gold,
+        ),
       );
+      optionControls = { readonly: values };
       return;
     }
 
+    const target = segmented({
+      value: opts.targetPoints,
+      name: 'Infamy to win',
+      options: TARGET_OPTIONS,
+      onChange: (v) => session.setOptions({ targetPoints: v }),
+    });
+    const timer = segmented({
+      value: opts.turnTimer,
+      name: 'Turn timer',
+      options: TIMER_OPTIONS,
+      onChange: (v) => session.setOptions({ turnTimer: v }),
+    });
+    const speed = segmented({
+      value: opts.aiSpeed,
+      name: 'AI speed',
+      options: [
+        { value: 'slow', label: 'Thoughtful' },
+        { value: 'normal', label: 'Normal' },
+        { value: 'fast', label: 'Snappy' },
+      ],
+      onChange: (v) => session.setOptions({ aiSpeed: v }),
+    });
+    const holds = toggle({
+      value: opts.revealReserved,
+      label: 'Everyone sees stowed cards',
+      tip: 'Off by default: a blind stow stays your secret.',
+      onChange: (v) => session.setOptions({ revealReserved: v }),
+    });
+    const gold = slider({
+      value: opts.extraGold, min: 0, max: 5, step: 1,
+      format: (v) => (v === 0 ? 'Standard (5)' : `+${v} (${5 + v})`),
+      label: 'Extra doubloons',
+      onInput: (v) => session.setOptions({ extraGold: v }),
+    });
+
     optionsPane.append(
-      field('Infamy to win',
-        segmented({
-          value: opts.targetPoints,
-          name: 'Infamy to win',
-          options: TARGET_OPTIONS,
-          onChange: (v) => session.setOptions({ targetPoints: v }),
-        }),
-        'Fifteen is the classic length.',
-      ),
-
-      field('Turn timer',
-        segmented({
-          value: opts.turnTimer,
-          name: 'Turn timer',
-          options: TIMER_OPTIONS,
-          onChange: (v) => session.setOptions({ turnTimer: v }),
-        }),
-        'When it runs out, a sensible move is played for you.',
-      ),
-
-      field('Computer captains move',
-        segmented({
-          value: opts.aiSpeed,
-          name: 'AI speed',
-          options: [
-            { value: 'slow', label: 'Thoughtful' },
-            { value: 'normal', label: 'Normal' },
-            { value: 'fast', label: 'Snappy' },
-          ],
-          onChange: (v) => session.setOptions({ aiSpeed: v }),
-        }),
-      ),
-
-      field('Open holds',
-        toggle({
-          value: opts.revealReserved,
-          label: 'Everyone sees stowed cards',
-          tip: 'Off by default: a blind stow stays your secret.',
-          onChange: (v) => session.setOptions({ revealReserved: v }),
-        }),
-      ),
-
-      field('Extra doubloons',
-        slider({
-          value: opts.extraGold, min: 0, max: 5, step: 1,
-          format: (v) => (v === 0 ? 'Standard (5)' : `+${v} (${5 + v})`),
-          label: 'Extra doubloons',
-          onInput: (v) => session.setOptions({ extraGold: v }),
-        }),
-        'A house rule. More gold means more stowing and fewer standoffs.',
-      ),
+      field('Infamy to win', target, 'Fifteen is the classic length.'),
+      field('Turn timer', timer, 'When it runs out, a sensible move is played for you.'),
+      field('Computer captains move', speed),
+      field('Open holds', holds),
+      field('Extra doubloons', gold,
+        'A house rule. More gold means more stowing and fewer standoffs.'),
     );
+    optionControls = { target, timer, speed, holds, gold };
+  }
+
+  /** Push new values into the existing controls without replacing them. */
+  function syncOptions(lobby) {
+    if (!optionControls) { buildOptions(lobby); return; }
+    const opts = lobby.options;
+
+    if (optionControls.readonly) {
+      const v = optionControls.readonly;
+      v.target.textContent = String(opts.targetPoints);
+      v.timer.textContent = opts.turnTimer ? `${opts.turnTimer}s` : 'Off';
+      v.speed.textContent = opts.aiSpeed;
+      v.holds.textContent = opts.revealReserved ? 'Yes' : 'No';
+      v.gold.textContent = String(opts.extraGold);
+      return;
+    }
+
+    optionControls.target.setValue(opts.targetPoints);
+    optionControls.timer.setValue(opts.turnTimer);
+    optionControls.speed.setValue(opts.aiSpeed);
+    optionControls.holds.setValue(opts.revealReserved);
+    // Leave the slider alone while it is being dragged, or the value
+    // snaps back under the user's thumb.
+    if (document.activeElement !== optionControls.gold.querySelector('input')) {
+      optionControls.gold.setValue(opts.extraGold);
+    }
   }
 
   function renderStart(lobby) {
@@ -372,7 +395,7 @@ export function renderLobby(mount, session, {
   function update(lobby) {
     codeText.textContent = lobby.code || '— — — —';
     renderSeats(lobby);
-    renderOptions(lobby);
+    syncOptions(lobby);
     renderStart(lobby);
     if (session.code) renderChat(lobby);
   }

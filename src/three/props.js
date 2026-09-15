@@ -607,15 +607,23 @@ export function createCrab({ seed = 1, home = new THREE.Vector3(), range = 3.2, 
 
   group.scale.setScalar(scale);
 
-  // Wandering state.
+  // Wandering state. `heading` is where the crab is pointed and
+  // `goalHeading` where it wants to be; it turns between them rather
+  // than snapping, so a change of mind reads as a scuttling pivot.
   const state = {
     pos: home.clone(),
     heading: rand() * Math.PI * 2,
+    goalHeading: 0,
     speed: 0.5 + rand() * 0.5,
+    turnRate: 1.6 + rand() * 1.1,   // radians per second
     restUntil: 0,
     nextTurn: rand() * 2,
     phase: rand() * 10,
   };
+  state.goalHeading = state.heading;
+
+  /** Shortest signed angle from a to b, so turns never take the long way. */
+  const angleDelta = (a, b) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
 
   group.userData.update = (time, dt, heightAt) => {
     const moving = time > state.restUntil;
@@ -625,26 +633,32 @@ export function createCrab({ seed = 1, home = new THREE.Vector3(), range = 3.2, 
       if (rand() < 0.22) {
         state.restUntil = time + 0.6 + rand() * 1.8;
       } else {
-        state.heading += (rand() - 0.5) * 2.2;
+        state.goalHeading = state.heading + (rand() - 0.5) * 2.2;
       }
     }
 
+    // Stay near home — decided from where it is, not where it is pointed.
+    if (state.pos.distanceTo(home) > range) {
+      state.goalHeading = Math.atan2(home.z - state.pos.z, home.x - state.pos.x)
+        + (rand() - 0.5) * 0.8;
+    }
+
+    // Turn toward the goal at a fixed rate.
+    const turn = angleDelta(state.heading, state.goalHeading);
+    const maxTurn = state.turnRate * dt;
+    state.heading += Math.abs(turn) <= maxTurn ? turn : Math.sign(turn) * maxTurn;
+
     if (moving) {
-      // Crabs walk sideways, so face across the direction of travel.
-      const step = state.speed * dt;
+      // A crab slows while it is still coming round.
+      const ease = 1 - Math.min(1, Math.abs(turn) / Math.PI) * 0.65;
+      const step = state.speed * ease * dt;
       state.pos.x += Math.cos(state.heading) * step;
       state.pos.z += Math.sin(state.heading) * step;
-
-      // Stay near home.
-      const away = state.pos.distanceTo(home);
-      if (away > range) {
-        const back = Math.atan2(home.z - state.pos.z, home.x - state.pos.x);
-        state.heading = back + (rand() - 0.5) * 0.8;
-      }
     }
 
     const y = heightAt ? heightAt(state.pos.x, state.pos.z) : 0;
     group.position.set(state.pos.x, y, state.pos.z);
+    // Crabs walk sideways, so the body sits across the line of travel.
     group.rotation.y = -state.heading + Math.PI / 2;
 
     // Legs paddle only while walking.
@@ -922,5 +936,134 @@ export function createTable({ radius = 6.2, height = 2.5, env = null } = {}) {
 
   group.userData.surfaceY = height + topThickness / 2;
   group.userData.radius = radius;
+  return group;
+}
+
+// ------------------------------------------------------------
+// Smaller shore life
+// ------------------------------------------------------------
+
+/**
+ * A sea snail: a spiral shell on a soft foot. Slow enough that it only
+ * needs a creep, not a gait.
+ */
+export function createSnail({ seed = 1, home = new THREE.Vector3(), range = 1.1, scale = 1 } = {}) {
+  const rand = rng(seed * 613 + 29);
+  const group = new THREE.Group();
+
+  const shellHue = [0xc9a06a, 0xb98a52, 0xd8b98a, 0xa8794a][Math.floor(rand() * 4)];
+  const shellMat = new THREE.MeshStandardMaterial({ color: shellHue, roughness: 0.55, metalness: 0.05 });
+  const footMat = new THREE.MeshStandardMaterial({ color: 0xd9c0a6, roughness: 0.85 });
+
+  // Shell: a tube wound into a flat spiral, so it reads as a whorl.
+  const turns = 2.4;
+  const points = [];
+  for (let i = 0; i <= 60; i++) {
+    const t = i / 60;
+    const a = t * Math.PI * 2 * turns;
+    const r = 0.06 + t * 0.2;
+    points.push(new THREE.Vector3(Math.cos(a) * r, Math.sin(a) * r, t * 0.1 - 0.05));
+  }
+  const shell = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 44, 0.075, 7, false),
+    shellMat,
+  );
+  shell.rotation.x = Math.PI / 2 - 0.35;
+  shell.position.set(0, 0.2, -0.04);
+  shell.castShadow = true;
+  group.add(shell);
+
+  // Foot.
+  const footGeo = new THREE.SphereGeometry(0.15, 10, 8);
+  footGeo.scale(1.5, 0.42, 0.85);
+  const foot = new THREE.Mesh(footGeo, footMat);
+  foot.position.set(0.07, 0.07, 0);
+  foot.receiveShadow = true;
+  group.add(foot);
+
+  // Eye stalks.
+  const stalks = [];
+  for (const dir of [-1, 1]) {
+    const stalk = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.018, 0.14, 5), footMat);
+    stalk.position.set(0.2, 0.13, dir * 0.05);
+    stalk.rotation.z = -0.5;
+    group.add(stalk);
+    stalks.push(stalk);
+  }
+
+  group.scale.setScalar(scale);
+
+  const state = { pos: home.clone(), heading: rand() * Math.PI * 2, phase: rand() * 9 };
+
+  group.userData.update = (time, dt, heightAt) => {
+    // A snail's pace, and it wanders in a slow arc rather than turning.
+    state.heading += Math.sin(time * 0.17 + state.phase) * dt * 0.5;
+    const step = 0.055 * dt;
+    state.pos.x += Math.cos(state.heading) * step;
+    state.pos.z += Math.sin(state.heading) * step;
+    if (state.pos.distanceTo(home) > range) {
+      state.heading = Math.atan2(home.z - state.pos.z, home.x - state.pos.x);
+    }
+    const y = heightAt ? heightAt(state.pos.x, state.pos.z) : 0;
+    group.position.set(state.pos.x, y, state.pos.z);
+    group.rotation.y = -state.heading;
+    // The stalks wave as it goes.
+    stalks.forEach((s, i) => { s.rotation.x = Math.sin(time * 1.3 + state.phase + i) * 0.22; });
+  };
+
+  return group;
+}
+
+/**
+ * A clam, half-buried and ajar. It breathes open and shut now and then
+ * but otherwise stays put.
+ */
+export function createClam({ seed = 1, scale = 1 } = {}) {
+  const rand = rng(seed * 331 + 7);
+  const group = new THREE.Group();
+  const tint = [0xe3d3bb, 0xd6c3a4, 0xeadcc4, 0xcbb595][Math.floor(rand() * 4)];
+  const shellMat = new THREE.MeshStandardMaterial({
+    color: tint, roughness: 0.42, metalness: 0.08, side: THREE.DoubleSide,
+  });
+
+  /** One ribbed valve: a half-dome with ridges running to the hinge. */
+  const valve = () => {
+    const geo = new THREE.SphereGeometry(0.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const a = Math.atan2(z, x);
+      const ripple = 1 + Math.sin(a * 11) * 0.045;
+      pos.setXYZ(i, x * ripple, pos.getY(i) * 0.62, z * ripple * 1.18);
+    }
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, shellMat);
+    mesh.castShadow = true;
+    return mesh;
+  };
+
+  const lower = valve();
+  lower.rotation.x = Math.PI;
+  lower.position.y = 0.08;
+  group.add(lower);
+
+  const upper = new THREE.Group();
+  const upperShell = valve();
+  upperShell.position.z = 0.0;
+  upper.add(upperShell);
+  upper.position.set(0, 0.08, -0.26);
+  group.add(upper);
+
+  group.scale.setScalar(scale);
+  group.rotation.y = rand() * Math.PI * 2;
+
+  const phase = rand() * 8;
+  group.userData.update = (time) => {
+    // Mostly shut, opening now and then for a breath.
+    const breath = Math.max(0, Math.sin(time * 0.33 + phase) - 0.72) / 0.28;
+    upper.rotation.x = -0.05 - breath * 0.42;
+  };
+
   return group;
 }

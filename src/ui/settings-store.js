@@ -25,12 +25,6 @@ export const DEFAULTS = {
     autoPassTokens: true,
     showLegalOnly: true,
   },
-  controls: {
-    invertDrag: false,
-    dragSensitivity: 1,
-    zoomSensitivity: 1,
-    edgePan: false,
-  },
   profile: { name: '' },
 };
 

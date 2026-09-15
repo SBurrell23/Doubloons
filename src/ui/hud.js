@@ -528,15 +528,20 @@ export function createHud(mount, {
         gemRow.append(gemChip(token, count, { size: 'sm', dim: count === 0 }));
       }
 
+      // Bonuses are the thing you actually plan around, so they get the
+      // most room on the card: a full-width row of stones with the
+      // count struck on each, greyed out at zero.
       const tally = el('div.bonus-tally', { tip: '#bonus' });
+      tally.append(el('span.bonus-tally__label', {}, 'Bonuses'));
+      const tallyRow = el('div.bonus-tally__row');
       for (const gem of GEMS) {
-        const col = el('div.bonus-tally__col');
-        col.append(el('span.bonus-tally__count', {}, String(bonuses[gem])));
-        for (let i = 0; i < Math.min(bonuses[gem], 6); i++) {
-          col.append(el('span.bonus-tally__chip', { style: { '--chip': GEM_INFO[gem].ui } }));
-        }
-        tally.append(col);
+        const n = bonuses[gem];
+        tallyRow.append(el(`div.bonus-tally__cell${n ? '' : '.bonus-tally__cell--none'}`, {
+          style: { '--chip': GEM_INFO[gem].ui, '--chip-dark': GEM_INFO[gem].dark },
+          tip: `${n} ${GEM_INFO[gem].label} bonus${n === 1 ? '' : 'es'}`,
+        }, el('span.bonus-tally__n', {}, String(n))));
       }
+      tally.append(tallyRow);
 
       const held = tokenTotal(player.tokens);
 

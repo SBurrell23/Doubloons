@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
 import { GEM_INFO, TIER_INFO } from '../game/data.js';
-import { drawCardArt } from './cardart/index.js';
+import { drawCardArt, ART_PALETTE } from './cardart/index.js';
+import { LORD_ART } from './cardart/lords.js';
 
 const noise = createNoise(20240714);
 const cache = new Map();
@@ -306,6 +307,32 @@ export function drawGem(ctx, cx, cy, r, gem, { outline = true } = {}) {
   ctx.restore();
 }
 
+/**
+ * A gem with its count struck across the face. Splendor prints the
+ * number on the stone, and reading it beside the stone costs a beat.
+ */
+export function drawGemWithCount(ctx, cx, cy, r, gem, amount) {
+  drawGem(ctx, cx, cy, r, gem);
+
+  // A dark lozenge behind the digit so it reads against any facet.
+  ctx.save();
+  ctx.globalAlpha = 0.42;
+  ctx.fillStyle = '#0c0703';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + r * 0.1, r * 0.62, r * 0.52, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = '#fff6df';
+  ctx.strokeStyle = 'rgba(8,5,2,0.95)';
+  ctx.lineWidth = Math.max(3, r * 0.17);
+  ctx.font = `700 ${Math.round(r * 1.18)}px Cinzel, Georgia, serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeText(String(amount), cx, cy + r * 0.12);
+  ctx.fillText(String(amount), cx, cy + r * 0.12);
+}
+
 /** Gold coin face, for doubloons. */
 export function drawDoubloon(ctx, cx, cy, r) {
   ctx.save();
@@ -400,6 +427,9 @@ const TIER_ACCENT = { 1: '#6b8f3a', 2: '#2f6f96', 3: '#8d3a6b' };
  */
 /** Where a card's illustration lives on its face. */
 export const ART_PANEL = { x: 32, y: 194, w: 356, h: 198 };
+
+/** Where a Pirate Lord's portrait lives on their tile. */
+export const LORD_ART_PANEL = { x: 44, y: 34, w: 332, h: 214 };
 
 export function cardFaceCanvas(card) {
   const { el, ctx } = canvas(CARD_W, CARD_H);
@@ -508,19 +538,10 @@ export function cardFaceCanvas(card) {
   ctx.stroke();
 
   const cellW = (CARD_W - 60) / costs.length;
-  const pipR = Math.min(34, cellW * 0.32);
+  const pipR = Math.min(52, cellW * 0.42);
   costs.forEach(([gem, amount], i) => {
     const cx = 30 + cellW * (i + 0.5);
-    drawGem(ctx, cx, stripY + 40, pipR, gem);
-
-    ctx.fillStyle = '#fff3d6';
-    ctx.strokeStyle = 'rgba(10,6,2,0.95)';
-    ctx.lineWidth = 6;
-    ctx.font = '700 42px Cinzel, Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeText(String(amount), cx, stripY + 92);
-    ctx.fillText(String(amount), cx, stripY + 92);
+    drawGemWithCount(ctx, cx, stripY + stripH / 2, pipR, gem, amount);
 
     // A divider between cells.
     if (i > 0) {
@@ -616,45 +637,69 @@ export function lordCanvas(lord) {
   roundRect(ctx, 22, 22, size - 44, size - 44, 18);
   ctx.stroke();
 
-  // Three infamy, top-left in a wax seal.
+  // Portrait. Falls back to a tricorn silhouette if this Lord has no
+  // drawing yet.
+  const { x: px, y: py, w: pw, h: ph } = LORD_ART_PANEL;
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.translate(px, py);
+  ctx.beginPath();
+  ctx.rect(0, 0, pw, ph);
+  ctx.clip();
+  const portrait = LORD_ART[lord.name];
+  let drew = false;
+  if (typeof portrait === 'function') {
+    try {
+      portrait(ctx, pw, ph, { ...ART_PALETTE, accent: '#9c2b2b' });
+      drew = true;
+    } catch (error) {
+      console.warn(`[lordart] ${lord.name} failed to draw`, error);
+    }
+  }
+  if (!drew) drawCaptainSilhouette(ctx, pw / 2, ph * 0.62, ph * 0.36);
+  ctx.restore();
+
+  // A hairline under the portrait, so it sits in the tile.
+  ctx.strokeStyle = 'rgba(107,74,16,0.45)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(px, py + ph);
+  ctx.lineTo(px + pw, py + ph);
+  ctx.stroke();
+
+  // The seal sits over the portrait's corner, like a stamp on a warrant.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 10;
   ctx.fillStyle = '#9c2b2b';
   ctx.beginPath();
   ctx.arc(74, 74, 42, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+  ctx.strokeStyle = '#d9b978';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(74, 74, 42, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.fillStyle = '#ffe9c0';
   ctx.font = '700 46px Cinzel, Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('3', 74, 78);
 
-  // Portrait: a simple silhouette in a tricorn.
-  drawCaptainSilhouette(ctx, size / 2, 176, 74);
-
   // Name.
   ctx.fillStyle = '#3a2410';
   ctx.font = '600 27px Cinzel, Georgia, serif';
-  wrapText(ctx, lord.name, size / 2, 256, size - 70, 34);
+  wrapText(ctx, lord.name, size / 2, 276, size - 70, 32);
   ctx.fillStyle = '#6b4a10';
   ctx.font = 'italic 21px Spectral, Georgia, serif';
-  ctx.fillText(lord.title, size / 2, 300);
+  ctx.fillText(lord.title, size / 2, 308);
 
   // Requirements.
   const reqs = Object.entries(lord.req);
-  const gap = 96;
+  const gap = 104;
   const startX = size / 2 - ((reqs.length - 1) * gap) / 2;
   reqs.forEach(([gem, n], i) => {
-    const x = startX + i * gap;
-    drawGem(ctx, x, 360, 28, gem);
-    ctx.fillStyle = '#3a2410';
-    ctx.strokeStyle = 'rgba(255,246,224,0.9)';
-    ctx.lineWidth = 5;
-    ctx.font = '700 32px Cinzel, Georgia, serif';
-    ctx.strokeText(String(n), x, 402);
-    ctx.fillText(String(n), x, 402);
+    drawGemWithCount(ctx, startX + i * gap, 372, 40, gem, n);
   });
 
   return el;

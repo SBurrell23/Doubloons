@@ -42,15 +42,16 @@
   --verdigris-bright: #4f9a7e;
 
   /* Gem colours, shared with the 3D layer */
-  --gem-pearl: #f0e7d6;
+  --gem-pearl: #f0942c;
   --gem-sapphire: #3f7ad6;
   --gem-emerald: #2ba362;
   --gem-ruby: #cf3f47;
-  --gem-onyx: #33333d;
+  --gem-onyx: #9b57c6;
   --gem-doubloon: #d9ab42;
 
   /* Type */
   --font-display: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', Georgia, serif;
+  --font-logo: 'Cinzel Decorative', 'Cinzel', Georgia, serif;
   --font-ui: 'Spectral', 'Palatino Linotype', Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
@@ -299,7 +300,7 @@ body { touch-action: none; }
    Form controls
    ------------------------------------------------------------ */
 
-.field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.15rem; text-align: center; }
 .field__label {
   font-family: var(--font-display);
   font-weight: 600;
@@ -399,34 +400,50 @@ body { touch-action: none; }
 }
 .panel--dark .slider-row__value { color: var(--brass-bright); }
 
-/* Toggle */
-.toggle { display: flex; align-items: center; gap: 0.65rem; cursor: pointer; }
+/* Toggle — a brass-cased switch with a legible ON/OFF groove. */
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+}
 .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
 .toggle__track {
-  width: 42px; height: 21px;
-  border-radius: 2px;
-  background: rgba(36, 24, 17, 0.4);
+  width: 62px; height: 30px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(10, 6, 3, 0.55), rgba(36, 24, 17, 0.4));
   border: 1px solid var(--brass-dark);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.55);
   position: relative;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.16s ease, border-color 0.16s ease;
   flex: none;
 }
+/* The knob: a brass slug with a milled face. */
 .toggle__track::after {
   content: '';
   position: absolute;
-  top: 2px; left: 2px;
-  width: 15px; height: 15px;
-  background: linear-gradient(180deg, #f2e6c8, var(--parchment-shade));
+  top: 3px; left: 3px;
+  width: 26px; height: 22px;
+  border-radius: 2px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, #f3e2b4, var(--brass) 55%, var(--brass-dark));
   border: 1px solid var(--brass-deep);
-  transition: transform 0.16s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  transition: transform 0.18s cubic-bezier(0.3, 1.2, 0.5, 1);
 }
 .toggle input:checked + .toggle__track {
-  background: linear-gradient(180deg, var(--verdigris-bright), var(--verdigris));
-  border-color: #1d3d31;
+  background: linear-gradient(180deg, #2f6b57, var(--verdigris));
+  border-color: var(--verdigris-bright);
 }
-.toggle input:checked + .toggle__track::after { transform: translateX(21px); }
+.toggle input:checked + .toggle__track::after { transform: translateX(30px); }
 .toggle input:focus-visible + .toggle__track { outline: 2px solid var(--brass-bright); outline-offset: 2px; }
-.toggle__label { font-size: 0.94rem; }
+.toggle__label {
+  font-size: 0.95rem;
+  min-width: 11ch;
+}
 
 /* ------------------------------------------------------------
    Gem chips — the shared currency display
@@ -465,7 +482,7 @@ body { touch-action: none; }
   background: linear-gradient(180deg, transparent 30%, rgba(0, 0, 0, 0.22));
 }
 .gem > span { position: relative; z-index: 1; }
-.gem--pearl { --gem-color: var(--gem-pearl); color: #241a10; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9); }
+.gem--pearl { --gem-color: var(--gem-pearl); }
 .gem--sapphire { --gem-color: var(--gem-sapphire); }
 .gem--emerald { --gem-color: var(--gem-emerald); }
 .gem--ruby { --gem-color: var(--gem-ruby); }

@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
 import {
   createIsland, createPalm, createRock, createCoconuts,
-  createDriftwood, createCrab, createTreasurePit, createTable,
+  createDriftwood, createCrab, createSnail, createClam,
+  createTreasurePit, createTable,
 } from './props.js';
 
 const noise = createNoise(5150);
@@ -46,11 +47,19 @@ const SKY_FRAG = /* glsl */`
   uniform vec3 sunDirection;
   uniform float offset;
   uniform float exponent;
+  uniform vec3 glowColor;
+  uniform float glowStrength;
 
   void main() {
     float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
     float t = pow(max(h, 0.0), exponent);
     vec3 col = mix(horizonColor, topColor, t);
+
+    // A band of pale sea-green sitting right on the horizon, the way
+    // old sailors' tales have it. Tight enough to stay a glow rather
+    // than turning the whole sky green.
+    float band = exp(-pow(max(h, -0.02) * 15.0, 2.0));
+    col = mix(col, glowColor, band * glowStrength);
 
     // Sun disc and a soft bloom around it.
     float sun = max(dot(normalize(vWorldPosition), normalize(sunDirection)), 0.0);
@@ -76,6 +85,8 @@ function createSky(sunDirection) {
       sunDirection: { value: sunDirection.clone().normalize() },
       offset: { value: 40 },
       exponent: { value: 0.72 },
+      glowColor: { value: new THREE.Color(0x76dd9b) },
+      glowStrength: { value: 0.8 },
     },
     vertexShader: SKY_VERT,
     fragmentShader: SKY_FRAG,
@@ -150,7 +161,7 @@ export const HAZE = 0x8dc3e8;
 /** The seat at the table: what you play from. */
 export const TABLE_VIEW = { dist: 15, yaw: 0, pitch: 0.80 };
 /** A wide establishing shot for the menus. */
-export const ISLAND_VIEW = { dist: 44, yaw: -0.5, pitch: 0.62 };
+export const ISLAND_VIEW = { dist: 30, yaw: -0.5, pitch: 0.56 };
 
 /** Island radius. The water shader needs it to place the lagoon. */
 const ISLAND_RADIUS = 26;
@@ -269,6 +280,7 @@ function createOcean(detail = 'high', shoreRadius = 26) {
         // thing that actually reads as water — survives.
         float fres = pow(1.0 - clamp(dot(worldNormal, viewDir), 0.0, 1.0), 5.0);
 
+        // The sea nearest the horizon picks up the same green cast.
         vec3 skyTint = vec3(0.40, 0.66, 0.84);
         vec3 deep = vec3(0.020, 0.145, 0.235);
 
@@ -288,6 +300,11 @@ function createOcean(detail = 'high', shoreRadius = 26) {
         float shore = 1.0 - smoothstep(uShore * 0.72, uShore * 1.46, length(vWorldPos.xz));
         gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.30, 0.72, 0.70), shore * 0.62);
 
+        // Far water takes a little of the horizon's green, so the two
+        // meet in the same colour.
+        float far = smoothstep(120.0, 620.0, length(vWorldPos.xz - cameraPosition.xz));
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.46, 0.84, 0.62), far * 0.5);
+
         // Foam only where the swells genuinely pile up, and a fringe
         // where they run out over the shallows.
         float foam = smoothstep(0.78, 1.00, vCrest);
@@ -297,7 +314,7 @@ function createOcean(detail = 'high', shoreRadius = 26) {
         #include <fog_fragment>
       `);
   };
-  material.customProgramCacheKey = () => `ocean-v5-${detail}`;
+  material.customProgramCacheKey = () => `ocean-v7-${detail}`;
 
   const mesh = new THREE.Mesh(geo, material);
   mesh.position.y = -1.4;
@@ -337,7 +354,6 @@ function createCameraRig(camera, domElement, target, initial = {}) {
   };
 
   const homeView = { dist: state.dist, yaw: state.yaw, pitch: state.pitch };
-  let controls = { dragSensitivity: 1, zoomSensitivity: 1, invertDrag: false };
 
   const keys = new Set();
   const pointers = new Map();
@@ -380,9 +396,8 @@ function createCameraRig(camera, domElement, target, initial = {}) {
       return;
     }
 
-    const invert = controls.invertDrag ? -1 : 1;
-    const dx = (event.clientX - last.x) * controls.dragSensitivity * invert;
-    const dy = (event.clientY - last.y) * controls.dragSensitivity * invert;
+    const dx = event.clientX - last.x;
+    const dy = event.clientY - last.y;
     last = { x: event.clientX, y: event.clientY };
     moved += Math.abs(dx) + Math.abs(dy);
 
@@ -409,7 +424,7 @@ function createCameraRig(camera, domElement, target, initial = {}) {
   const onWheel = (event) => {
     if (!state.enabled || !onCanvas(event)) return;
     event.preventDefault();
-    const step = (event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY) * controls.zoomSensitivity;
+    const step = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaY;
     state.goalDist = clamp(state.goalDist * Math.pow(1.0016, step), state.minDist, state.maxDist);
   };
 
@@ -456,25 +471,25 @@ function createCameraRig(camera, domElement, target, initial = {}) {
     // Keyboard. Pan speed scales with distance so it feels the same
     // whether you are over the table or out at sea.
     if (state.enabled && keys.size) {
-      const pan = state.dist * 0.9 * dt;
+      const pan = state.dist * 2.6 * dt;
       const right = new THREE.Vector3(Math.cos(state.yaw), 0, -Math.sin(state.yaw));
       const fwd = new THREE.Vector3(Math.sin(state.yaw), 0, Math.cos(state.yaw));
       if (keys.has('KeyW') || keys.has('ArrowUp')) state.goalTarget.addScaledVector(fwd, -pan);
       if (keys.has('KeyS') || keys.has('ArrowDown')) state.goalTarget.addScaledVector(fwd, pan);
       if (keys.has('KeyA') || keys.has('ArrowLeft')) state.goalTarget.addScaledVector(right, -pan);
       if (keys.has('KeyD') || keys.has('ArrowRight')) state.goalTarget.addScaledVector(right, pan);
-      if (keys.has('KeyQ')) state.goalYaw += dt * 1.1;
-      if (keys.has('KeyE')) state.goalYaw -= dt * 1.1;
+      if (keys.has('KeyQ')) state.goalYaw += dt * 1.9;
+      if (keys.has('KeyE')) state.goalYaw -= dt * 1.9;
       if (keys.has('Equal') || keys.has('NumpadAdd')) {
-        state.goalDist = clamp(state.goalDist * (1 - dt), state.minDist, state.maxDist);
+        state.goalDist = clamp(state.goalDist * (1 - dt * 2.2), state.minDist, state.maxDist);
       }
       if (keys.has('Minus') || keys.has('NumpadSubtract')) {
-        state.goalDist = clamp(state.goalDist * (1 + dt), state.minDist, state.maxDist);
+        state.goalDist = clamp(state.goalDist * (1 + dt * 2.2), state.minDist, state.maxDist);
       }
       clampTarget();
     }
 
-    const s = 1 - Math.pow(0.0015, dt);
+    const s = 1 - Math.pow(0.0000012, dt);
     state.target.lerp(state.goalTarget, s);
     state.dist += (state.goalDist - state.dist) * s;
     state.yaw += (state.goalYaw - state.yaw) * s;
@@ -524,7 +539,6 @@ function createCameraRig(camera, domElement, target, initial = {}) {
         state.pitch = state.goalPitch;
       }
     },
-    setControls(next) { controls = { ...controls, ...next }; },
     setEnabled(v) {
       state.enabled = v;
       if (!v) { pointers.clear(); mode = null; last = null; keys.clear(); }
@@ -677,20 +691,51 @@ export function createWorld(container, graphics = {}) {
   const driftwood = createDriftwood(2);
   plant(driftwood, 12.4, 10.6, { yOffset: 0.3 });
 
-  // --- crabs ---
-  const crabs = [];
+  // --- shore life ---
+  // Everything here shares one update signature so the loop can drive
+  // them together, and all of it hides behind the wildlife setting.
+  const critters = [];
   if (settings.wildlife) {
-    const homes = [
+    const crabHomes = [
       new THREE.Vector3(10.6, 0, 6.6),
       new THREE.Vector3(-12.2, 0, 2.6),
       new THREE.Vector3(2.4, 0, 13.2),
       new THREE.Vector3(-5.6, 0, -12.4),
+      new THREE.Vector3(14.8, 0, -12.0),
     ];
-    homes.forEach((home, i) => {
+    crabHomes.forEach((home, i) => {
       const crab = createCrab({ seed: i + 3, home, range: 3.0, scale: 0.8 + i * 0.06 });
       props.add(crab);
-      crabs.push(crab);
+      critters.push(crab);
     });
+
+    // Snails creep along the wetter sand, nearer the waterline.
+    const snailHomes = [
+      new THREE.Vector3(16.2, 0, 8.4),
+      new THREE.Vector3(-15.0, 0, -6.2),
+      new THREE.Vector3(-3.0, 0, 17.4),
+      new THREE.Vector3(7.8, 0, -16.2),
+      new THREE.Vector3(-17.4, 0, 6.0),
+      new THREE.Vector3(12.0, 0, 15.0),
+    ];
+    snailHomes.forEach((home, i) => {
+      const snail = createSnail({ seed: i + 11, home, range: 1.2, scale: 0.9 + (i % 3) * 0.12 });
+      props.add(snail);
+      critters.push(snail);
+    });
+
+    // Clams sit where the tide leaves them.
+    const clamSpots = [
+      [17.6, 4.2, 1.0], [-16.8, -9.4, 0.85], [5.4, 18.2, 1.15],
+      [-8.6, 16.4, 0.95], [-18.6, 1.2, 1.05], [13.6, -14.8, 0.9],
+      [1.8, -18.0, 1.1], [-12.0, -14.0, 0.8],
+    ];
+    for (const [x, z, sc] of clamSpots) {
+      const clam = createClam({ seed: Math.round(x * 31 + z * 7), scale: sc });
+      clam.position.set(x, heightAt(x, z), z);
+      props.add(clam);
+      critters.push(clam);
+    }
   }
 
   // --- the dug hole with the chest ---
@@ -740,7 +785,7 @@ export function createWorld(container, graphics = {}) {
     palm.userData.sway(time, 1);
     clouds.userData.update(time);
     if (settings.sparkles) pit.userData.update(time);
-    for (const crab of crabs) crab.userData.update(time, dt, heightAt);
+    for (const critter of critters) critter.userData.update(time, dt, heightAt);
 
     for (const cb of frameCallbacks) cb(dt, time);
 
@@ -845,7 +890,7 @@ export function createWorld(container, graphics = {}) {
       scene.add(ocean);
     }
 
-    for (const crab of crabs) crab.visible = settings.wildlife;
+    for (const critter of critters) critter.visible = settings.wildlife;
     resize();
   }
 

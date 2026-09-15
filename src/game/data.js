@@ -11,12 +11,18 @@ export const GOLD = 'doubloon';
 
 export const ALL_TOKENS = [...GEMS, GOLD];
 
+/**
+ * The five gem colours. The keys are historical — the cards and their
+ * art are keyed off them — but the stones themselves are amber and
+ * amethyst rather than the original pearl and onyx, which read poorly
+ * as white and black against the table.
+ */
 export const GEM_INFO = {
-  pearl: { label: 'Pearl', short: 'Prl', hex: 0xf4ece0, ui: '#f6efe2', dark: '#b7a992' },
+  pearl: { label: 'Amber', short: 'Amb', hex: 0xdd7a1e, ui: '#f0942c', dark: '#7d3f06' },
   sapphire: { label: 'Sapphire', short: 'Sph', hex: 0x2e6fd6, ui: '#4f8ef0', dark: '#1b3f80' },
   emerald: { label: 'Emerald', short: 'Eme', hex: 0x24a95f, ui: '#35c274', dark: '#146138' },
   ruby: { label: 'Ruby', short: 'Rby', hex: 0xd4343c, ui: '#ef5159', dark: '#7d1a20' },
-  onyx: { label: 'Onyx', short: 'Onx', hex: 0x2b2b33, ui: '#4a4a57', dark: '#111116' },
+  onyx: { label: 'Amethyst', short: 'Amy', hex: 0x7b3aa8, ui: '#9b57c6', dark: '#3d1a57' },
   doubloon: { label: 'Doubloon', short: 'Dbl', hex: 0xe8b53a, ui: '#f0c34c', dark: '#8a6414' },
 };
 
