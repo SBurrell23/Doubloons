@@ -96,7 +96,7 @@ function miniCard(x, y, w, h, { bonus = 'sapphire', points = 2, cost = { pearl: 
 
   const entries = Object.entries(cost).filter(([, n]) => n > 0);
   entries.forEach(([gem, n], i) => {
-    group.append(gemShape(x + w * 0.19, y + h * (0.92 - i * 0.17), w * 0.13, gem, n));
+    group.append(gemShape(x + w * 0.19, y + h * (0.85 - i * 0.17), w * 0.13, gem, n));
   });
   return group;
 }
@@ -146,24 +146,25 @@ function figure(diagram, caption) {
 // ------------------------------------------------------------
 
 function anatomyDiagram() {
-  const root = svg('svg', { viewBox: '0 0 440 300', class: 'guide__svg', role: 'img', 'aria-label': 'The parts of a card' });
-  root.append(miniCard(150, 25, 140, 200, {
+  const root = svg('svg', { viewBox: '0 0 480 310', class: 'guide__svg', role: 'img', 'aria-label': 'The parts of a card' });
+  root.append(miniCard(168, 22, 132, 196, {
     bonus: 'sapphire', points: 2, cost: { pearl: 3, ruby: 2 }, name: 'Azure Reef',
   }));
 
-  root.append(arrow(120, 55, 165, 55));
-  root.append(label(116, 50, 'Infamy it', { anchor: 'end', size: 13 }));
-  root.append(label(116, 66, 'is worth', { anchor: 'end', size: 13 }));
+  root.append(arrow(128, 52, 164, 52));
+  root.append(label(122, 47, 'Infamy it', { anchor: 'end', size: 13 }));
+  root.append(label(122, 63, 'is worth', { anchor: 'end', size: 13 }));
 
-  root.append(arrow(360, 55, 290, 52));
-  root.append(label(366, 50, 'The bonus', { anchor: 'start', size: 13 }));
-  root.append(label(366, 66, 'colour it gives', { anchor: 'start', size: 13 }));
+  root.append(arrow(340, 52, 304, 50));
+  root.append(label(346, 47, 'The bonus', { anchor: 'start', size: 13 }));
+  root.append(label(346, 63, 'it gives', { anchor: 'start', size: 13 }));
 
-  root.append(arrow(120, 215, 168, 205));
-  root.append(label(116, 205, 'What it costs', { anchor: 'end', size: 13 }));
-  root.append(label(116, 221, 'to buy', { anchor: 'end', size: 13 }));
+  root.append(arrow(128, 196, 166, 190));
+  root.append(label(122, 186, 'What it costs', { anchor: 'end', size: 13 }));
+  root.append(label(122, 202, 'to buy', { anchor: 'end', size: 13 }));
 
-  root.append(label(220, 260, 'Buy it, and the bonus is yours for the rest of the game.', { size: 13, italic: true }));
+  root.append(label(240, 262, 'Buy it, and that bonus is yours for the rest', { size: 13, italic: true }));
+  root.append(label(240, 282, 'of the game.', { size: 13, italic: true }));
   return root;
 }
 
