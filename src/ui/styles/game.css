@@ -252,23 +252,26 @@
   place-items: center;
   border: 2px solid var(--chip);
   border-radius: 2px;
-  background: linear-gradient(180deg, rgba(20, 12, 6, 0.82), rgba(20, 12, 6, 0.68));
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 5px -1px var(--chip);
+  /* Pale parchment, like the card it sits on. The colour identity comes
+     from the border and the digit; a dark fill made both hard to read. */
+  background: linear-gradient(180deg, #fbf3dd, #ecdfbd);
+  box-shadow: inset 0 -2px 3px rgba(122, 96, 52, 0.22);
 }
 .bonus-tally__n {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.08rem;
+  font-size: 1.12rem;
   line-height: 1;
-  color: var(--chip);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  /* The deep cut of the gem colour, so every one of the five reads
+     against the parchment. */
+  color: var(--chip-dark);
 }
 .bonus-tally__cell--none {
-  border-color: rgba(107, 82, 34, 0.45);
-  background: rgba(36, 24, 17, 0.1);
+  border-color: rgba(107, 82, 34, 0.4);
+  background: rgba(36, 24, 17, 0.07);
   box-shadow: none;
 }
-.bonus-tally__cell--none .bonus-tally__n { color: var(--ink-faint); text-shadow: none; }
+.bonus-tally__cell--none .bonus-tally__n { color: var(--ink-faint); }
 
 .player-card__stat {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
