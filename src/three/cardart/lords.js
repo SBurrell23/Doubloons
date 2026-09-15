@@ -383,9 +383,8 @@ export const LORD_ART = {
 
   'Dame Isolde Vane': (ctx, w, h, p) => {
     const cx = w * 0.5;
-    // Set low: the cocked front corner of the tricorne comes down
-    // almost to the brow, so the face has to clear it.
-    const hy = h * 0.55;
+    // Set low, so the sweep of the tricorne's brim clears the brow.
+    const hy = h * 0.53;
     const rx = w * 0.09;
     const ry = h * 0.165;
 
@@ -393,23 +392,35 @@ export const LORD_ART = {
 
     // Lace ruff: a ring of scalloped lobes set about the neck. Laid
     // down before the bodice, so only the scalloped rim shows.
-    const ny = h * 0.72;
-    for (let i = 0; i < 11; i++) {
-      const a = Math.PI * (0.08 + (i / 10) * 0.84);
-      ctx.beginPath();
-      ctx.ellipse(
-        cx + Math.cos(a) * w * 0.175,
-        ny + Math.sin(a) * h * 0.18,
-        w * 0.042, h * 0.05, a, 0, TAU
-      );
-      ctx.fillStyle = p.sail;
-      ctx.fill();
-      pen(ctx, p.ink, 2.2);
-      ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.235, h * 0.82);
+    ctx.quadraticCurveTo(cx - w * 0.12, h * 0.69, cx, h * 0.71);
+    ctx.quadraticCurveTo(cx + w * 0.12, h * 0.69, cx + w * 0.235, h * 0.82);
+    ctx.lineTo(cx + w * 0.235, h * 0.9);
+    const lobes = 8;
+    const span = (w * 0.47) / lobes;
+    for (let i = 0; i < lobes; i++) {
+      const x0 = cx + w * 0.235 - i * span;
+      ctx.quadraticCurveTo(x0 - span * 0.5, h * 0.99, x0 - span, h * 0.9);
     }
+    ctx.closePath();
+    ctx.fillStyle = p.sail;
+    ctx.fill();
+    pen(ctx, p.ink, 2.4);
+    ctx.stroke();
+    // Lace threads running out from the neck.
+    pen(ctx, p.inkSoft, 1.3);
+    ctx.beginPath();
+    for (let i = 0; i < 11; i++) {
+      const t = i / 10;
+      const x = cx - w * 0.225 + t * w * 0.45;
+      ctx.moveTo(x, h * 0.75 + Math.abs(t - 0.5) * h * 0.12);
+      ctx.lineTo(x, h * 0.89);
+    }
+    ctx.stroke();
 
     // Bodice over the top of it.
-    bust(ctx, h, cx, rx * 0.46, hy + ry * 0.98, w * 0.17, w * 0.17, 0.26);
+    bust(ctx, h, cx, rx * 0.46, hy + ry * 0.98, w * 0.215, w * 0.215, 0.22);
     ctx.fillStyle = p.ink;
     ctx.fill();
     pen(ctx, p.line, 2.4);
@@ -471,14 +482,15 @@ export const LORD_ART = {
     ctx.stroke();
 
     // The tricorne: three hard points, worn square.
-    // Two side corners and a third cocked forward over the brow.
+    // Two corners swept out to the sides, the third cocked forward
+    // to a shallow point above the brow.
     const bx = w * 0.3;
     ctx.beginPath();
-    ctx.moveTo(cx - bx, h * 0.28);
+    ctx.moveTo(cx - bx, h * 0.29);
     ctx.quadraticCurveTo(cx - bx * 0.52, h * 0.02, cx, h * 0.04);
-    ctx.quadraticCurveTo(cx + bx * 0.52, h * 0.02, cx + bx, h * 0.28);
-    ctx.quadraticCurveTo(cx + bx * 0.46, h * 0.36, cx, h * 0.48);
-    ctx.quadraticCurveTo(cx - bx * 0.46, h * 0.36, cx - bx, h * 0.28);
+    ctx.quadraticCurveTo(cx + bx * 0.52, h * 0.02, cx + bx, h * 0.29);
+    ctx.quadraticCurveTo(cx + bx * 0.5, h * 0.4, cx, h * 0.42);
+    ctx.quadraticCurveTo(cx - bx * 0.5, h * 0.4, cx - bx, h * 0.29);
     ctx.closePath();
     ctx.fillStyle = p.ink;
     ctx.fill();
@@ -688,9 +700,9 @@ export const LORD_ART = {
       ctx.stroke();
     }
     ctx.beginPath();
-    ctx.moveTo(px + s * 0.72, py + s * 0.72);
-    ctx.quadraticCurveTo(px + s * 1.4, py + s * 0.3, px + s * 1.28, py - s * 0.3);
-    ctx.quadraticCurveTo(px + s * 0.98, py - s * 0.24, px + s * 0.86, py + s * 0.2);
+    ctx.moveTo(px + s * 0.66, py + s * 0.82);
+    ctx.quadraticCurveTo(px + s * 1.26, py + s * 0.5, px + s * 1.22, py - s * 0.12);
+    ctx.quadraticCurveTo(px + s * 0.98, py - s * 0.16, px + s * 0.8, py + s * 0.3);
     ctx.closePath();
     ctx.fillStyle = p.sail;
     ctx.fill();
@@ -880,11 +892,11 @@ export const LORD_ART = {
     ctx.moveTo(cx - w * 0.11, h * 0.74);
     ctx.quadraticCurveTo(cx, h * 0.86, cx + w * 0.12, h * 0.73);
     ctx.stroke();
-    for (let i = 0; i < 5; i++) {
-      const t = i / 4;
-      const x = cx - w * 0.1 + t * w * 0.2;
+    for (let i = 0; i < 3; i++) {
+      const t = i / 2;
+      const x = cx - w * 0.09 + t * w * 0.18;
       const y = h * 0.78 + Math.sin(t * Math.PI) * h * 0.05;
-      bone(ctx, x - w * 0.012, y, x + w * 0.012, y + h * 0.05, Math.min(w, h) * 0.017, p.sail, p.ink);
+      bone(ctx, x - w * 0.016, y, x + w * 0.016, y + h * 0.07, Math.min(w, h) * 0.022, p.sail, p.ink);
     }
 
     // White tufts puffing out over the ears — the rest of him is bald.
@@ -988,10 +1000,15 @@ export const LORD_ART = {
     ctx.arc(cx + rx * 1.9, hy + ry * 1.5, Math.min(w, h) * 0.028, 0, TAU);
     ctx.stroke();
 
-    // A relic skull held up in the other hand.
-    const sx = w * 0.14;
-    const sy = h * 0.66;
-    const sr = Math.min(w, h) * 0.085;
+    // A relic skull, hung on a cord with the rest of his stock.
+    const sx = w * 0.13;
+    const sy = h * 0.52;
+    const sr = Math.min(w, h) * 0.095;
+    pen(ctx, p.line, 1.8);
+    ctx.beginPath();
+    ctx.moveTo(sx, 0);
+    ctx.lineTo(sx, sy - sr * 1.1);
+    ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(sx - sr, sy - sr * 0.15);
     ctx.quadraticCurveTo(sx - sr, sy - sr * 1.15, sx, sy - sr * 1.15);
@@ -1019,29 +1036,15 @@ export const LORD_ART = {
     ctx.lineTo(sx + sr * 0.15, sy + sr * 0.4);
     ctx.closePath();
     ctx.fill();
-    // An old hand cupped beneath it, fingers curling up the jaw.
+    // Teeth along the jaw of it.
+    pen(ctx, p.ink, 1.6);
     ctx.beginPath();
-    ctx.moveTo(sx - sr * 0.95, sy + sr * 0.72);
-    ctx.quadraticCurveTo(sx, sy + sr * 2.0, sx + sr * 0.95, sy + sr * 0.72);
-    ctx.quadraticCurveTo(sx + sr * 1.1, sy + sr * 1.7, sx, sy + sr * 1.85);
-    ctx.quadraticCurveTo(sx - sr * 1.1, sy + sr * 1.7, sx - sr * 0.95, sy + sr * 0.72);
-    ctx.closePath();
-    ctx.fillStyle = p.paperDark;
-    ctx.fill();
-    pen(ctx, p.ink, 2.6);
-    ctx.stroke();
-    ctx.fillStyle = p.paperDark;
-    for (let i = 0; i < 3; i++) {
-      const fx = sx - sr * 0.62 + i * sr * 0.62;
-      ctx.beginPath();
-      ctx.moveTo(fx - sr * 0.24, sy + sr * 1.25);
-      ctx.quadraticCurveTo(fx - sr * 0.3, sy + sr * 0.3, fx, sy + sr * 0.42);
-      ctx.quadraticCurveTo(fx + sr * 0.3, sy + sr * 0.32, fx + sr * 0.24, sy + sr * 1.25);
-      ctx.closePath();
-      ctx.fill();
-      pen(ctx, p.ink, 2.2);
-      ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const tx = sx - sr * 0.3 + i * sr * 0.2;
+      ctx.moveTo(tx, sy + sr * 0.62);
+      ctx.lineTo(tx, sy + sr * 0.98);
     }
+    ctx.stroke();
   },
 
   // ----------------------------------------------------------
@@ -1406,12 +1409,17 @@ export const LORD_ART = {
     pen(ctx, p.line, 2.6);
     ctx.stroke();
 
-    // The beak: a broad bone wedge hooking down out of the shadow.
+    // The beak: broad at the brow, tapering, hooked at the tip.
     ctx.beginPath();
-    ctx.moveTo(cx - w * 0.058, hy - h * 0.03);
-    ctx.quadraticCurveTo(cx - w * 0.042, hy + h * 0.22, cx - w * 0.012, h * 0.85);
-    ctx.quadraticCurveTo(cx + w * 0.018, h * 0.91, cx + w * 0.026, h * 0.78);
-    ctx.quadraticCurveTo(cx + w * 0.05, hy + h * 0.2, cx + w * 0.058, hy - h * 0.03);
+    ctx.moveTo(cx - w * 0.072, hy - h * 0.05);
+    ctx.bezierCurveTo(
+      cx - w * 0.066, hy + h * 0.2,
+      cx - w * 0.05, h * 0.7,
+      cx - w * 0.028, h * 0.84
+    );
+    ctx.quadraticCurveTo(cx - w * 0.002, h * 0.93, cx + w * 0.024, h * 0.85);
+    ctx.quadraticCurveTo(cx + w * 0.032, h * 0.7, cx + w * 0.046, hy + h * 0.18);
+    ctx.quadraticCurveTo(cx + w * 0.07, hy + h * 0.02, cx + w * 0.072, hy - h * 0.05);
     ctx.closePath();
     ctx.fillStyle = p.sail;
     ctx.fill();
@@ -1419,13 +1427,13 @@ export const LORD_ART = {
     ctx.stroke();
     ctx.save();
     ctx.clip();
-    hatch(ctx, p.inkSoft, cx - w * 0.08, hy, w * 0.16, h * 0.6, w * 0.016, 0.1, 0.35, 1.2);
+    hatch(ctx, p.inkSoft, cx - w * 0.09, hy, w * 0.18, h * 0.6, w * 0.016, 0.12, 0.35, 1.2);
     ctx.restore();
     // The crease along the beak's ridge.
     pen(ctx, p.ink, 2);
     ctx.beginPath();
-    ctx.moveTo(cx - w * 0.005, hy + h * 0.02);
-    ctx.quadraticCurveTo(cx + w * 0.012, hy + h * 0.28, cx + w * 0.018, h * 0.78);
+    ctx.moveTo(cx - w * 0.024, hy + h * 0.01);
+    ctx.quadraticCurveTo(cx - w * 0.014, hy + h * 0.3, cx - w * 0.004, h * 0.82);
     ctx.stroke();
 
     // The mask's upper plate and two blank lenses.
@@ -1485,9 +1493,11 @@ export const LORD_ART = {
     ctx.fill();
     for (const s of [-1, 1]) {
       ctx.beginPath();
-      ctx.moveTo(cx + s * rx * 0.62, hy + ry * 1.0);
-      ctx.lineTo(cx + s * rx * 2.2, hy + ry * 0.35);
-      ctx.lineTo(cx + s * rx * 2.05, hy + ry * 2.1);
+      ctx.moveTo(cx + s * rx * 0.55, hy + ry * 1.05);
+      ctx.lineTo(cx + s * rx * 1.3, hy + ry * 0.12);
+      ctx.lineTo(cx + s * rx * 1.95, hy + ry * 1.0);
+      ctx.lineTo(cx + s * rx * 2.15, hy + ry * 2.3);
+      ctx.lineTo(cx + s * rx * 0.85, hy + ry * 2.3);
       ctx.closePath();
       ctx.fillStyle = p.woodDark;
       ctx.fill();
@@ -1510,11 +1520,15 @@ export const LORD_ART = {
 
     // Cropped hair, set well back off a broad forehead.
     ctx.beginPath();
-    ctx.moveTo(cx - rx * 1.04, hy - ry * 0.48);
+    ctx.moveTo(cx - rx * 1.02, hy - ry * 0.52);
     ctx.quadraticCurveTo(cx - rx * 1.16, hy - ry * 1.3, cx, hy - ry * 1.26);
-    ctx.quadraticCurveTo(cx + rx * 1.16, hy - ry * 1.3, cx + rx * 1.04, hy - ry * 0.48);
-    ctx.quadraticCurveTo(cx + rx * 0.86, hy - ry * 0.92, cx, hy - ry * 0.86);
-    ctx.quadraticCurveTo(cx - rx * 0.86, hy - ry * 0.92, cx - rx * 1.04, hy - ry * 0.48);
+    ctx.quadraticCurveTo(cx + rx * 1.16, hy - ry * 1.3, cx + rx * 1.02, hy - ry * 0.52);
+    // Inner hairline, cut square, with a peak dropped at the centre.
+    ctx.lineTo(cx + rx * 0.84, hy - ry * 0.64);
+    ctx.quadraticCurveTo(cx + rx * 0.46, hy - ry * 0.92, cx + rx * 0.24, hy - ry * 0.88);
+    ctx.lineTo(cx, hy - ry * 0.68);
+    ctx.lineTo(cx - rx * 0.24, hy - ry * 0.88);
+    ctx.quadraticCurveTo(cx - rx * 0.46, hy - ry * 0.92, cx - rx * 0.84, hy - ry * 0.64);
     ctx.closePath();
     ctx.fillStyle = p.ink;
     ctx.fill();
