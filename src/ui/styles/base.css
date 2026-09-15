@@ -424,9 +424,7 @@ body { touch-action: none; }
   transform: translateY(-50%);
   width: 26px; height: 22px;
   border-radius: 2px;
-  background:
-    repeating-linear-gradient(90deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 4px),
-    linear-gradient(180deg, #f3e2b4, var(--brass) 55%, var(--brass-dark));
+  background: linear-gradient(180deg, #f6e8c2, var(--brass) 58%, var(--brass-dark));
   border: 1px solid var(--brass-deep);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   transition: transform 0.18s cubic-bezier(0.3, 1.2, 0.5, 1);
