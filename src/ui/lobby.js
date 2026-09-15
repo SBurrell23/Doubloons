@@ -56,11 +56,9 @@ export function renderTitle(mount, {
 
   const screen = el('div.screen.screen--title', {},
     el('div.title__plate', {},
-      el('div.title__banner', {},
-        el('div.title__crest', {}, icon('skull', { size: '2.2rem' })),
-        el('h1.title__logo', {}, el('span', {}, 'Doubloons')),
-        el('div.title__hairline'),
-      ),
+      el('div.title__crest', {}, icon('skull', { size: '2.4rem' })),
+      el('h1.title__logo', {}, el('span', {}, 'Doubloons')),
+      el('div.title__hairline'),
       el('p.title__tag', {}, 'Gems, galleons and a reputation worth hanging for.'),
 
       el('div.title__name-row', {}, nameInput),

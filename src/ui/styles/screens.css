@@ -40,26 +40,6 @@
 
 .title__crest { display: flex; justify-content: center; margin-bottom: 0.5rem; color: var(--wood-dark); }
 
-/* A band of deep water behind the wordmark, so the brass reads the way
-   it does on the loading screen. */
-.title__banner {
-  margin: 0 -1px 0.2rem;
-  padding: 0.55rem 0.6rem 0.65rem;
-  background: linear-gradient(180deg, var(--sea), var(--sea-deep));
-  border: 1px solid var(--brass-dark);
-  border-radius: var(--radius);
-  box-shadow: inset 0 0 0 1px rgba(176, 141, 69, 0.22);
-}
-.title__banner .title__crest { color: var(--brass); margin-bottom: 0.25rem; }
-.title__banner .title__hairline { margin: 0.6rem 0 0; }
-.title__banner .title__hairline::after { background: var(--brass); border-color: var(--brass-deep); }
-.title__crest .icon { opacity: 0.9; }
-
-/*
- * Letter-spacing leaves a trailing gap after the final character, which
- * drags centred text off to the left. Flex-centre an inner span and pull
- * that gap back with a negative margin, so the glyphs sit dead centre.
- */
 .title__logo {
   margin: 0;
   display: flex;
@@ -70,6 +50,9 @@
    and brass. The plate behind it is parchment rather than deep water,
    so a soft dark shadow carries the contrast the dark ground gave it
    for free. */
+/* The loading screen's lettering — same face, weight, tracking and
+   brass — with a brown edge struck behind it so the gold still reads
+   on parchment instead of the deep water it sits on at boot. */
 .title__logo > span {
   font-family: var(--font-display);
   font-weight: 700;
@@ -78,7 +61,9 @@
   margin-right: -0.2em;
   text-transform: uppercase;
   color: var(--brass-bright);
-  text-shadow: 0 2px 3px rgba(36, 22, 8, 0.55), 0 1px 0 rgba(58, 36, 16, 0.75);
+  -webkit-text-stroke: 3px #3d2410;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 2px 0 #2a1a0c) drop-shadow(0 4px 7px rgba(20, 10, 0, 0.35));
 }
 
 /* A rule broken by a small brass lozenge. */

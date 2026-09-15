@@ -39,7 +39,7 @@ export function el(spec, props = null, ...children) {
       if (key === 'class') node.className = [node.className, value].filter(Boolean).join(' ');
       else if (key === 'text') node.textContent = value;
       else if (key === 'html') node.innerHTML = value;
-      else if (key === 'style' && typeof value === 'object') Object.assign(node.style, value);
+      else if (key === 'style' && typeof value === 'object') applyStyle(node, value);
       else if (key === 'dataset') Object.assign(node.dataset, value);
       else if (key.startsWith('on') && typeof value === 'function') {
         node.addEventListener(key.slice(2).toLowerCase(), value);
@@ -52,6 +52,19 @@ export function el(spec, props = null, ...children) {
 
   append(node, children);
   return node;
+}
+
+/**
+ * Object.assign onto a CSSStyleDeclaration silently drops custom
+ * properties — they only land through setProperty — so every
+ * `--var` passed as a style was being thrown away.
+ */
+function applyStyle(node, style) {
+  for (const [prop, value] of Object.entries(style)) {
+    if (value === null || value === undefined) continue;
+    if (prop.startsWith('--')) node.style.setProperty(prop, String(value));
+    else node.style[prop] = value;
+  }
 }
 
 export function append(parent, children) {
