@@ -224,8 +224,8 @@
 
 /* Bonus tally — the headline number on each player card. */
 .bonus-tally {
-  margin: 6px 0 7px;
-  padding: 5px 5px 6px;
+  margin: 5px 0 6px;
+  padding: 4px 4px 5px;
   background: rgba(36, 24, 17, 0.14);
   border: 1px solid rgba(107, 82, 34, 0.4);
   border-radius: 3px;
@@ -238,16 +238,16 @@
   text-transform: uppercase;
   color: var(--ink-soft);
   text-align: center;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
-.bonus-tally__row { display: flex; gap: 4px; }
+.bonus-tally__row { display: flex; gap: 3px; }
 /*
  * Outlined in the gem's own colour rather than filled with it, so a
  * bonus never gets mistaken for a token in hand two rows above.
  */
 .bonus-tally__cell {
   flex: 1;
-  height: 32px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 2px solid var(--chip);
@@ -260,7 +260,7 @@
 .bonus-tally__n {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 1.12rem;
+  font-size: 0.95rem;
   line-height: 1;
   /* The deep cut of the gem colour, so every one of the five reads
      against the parchment. */
