@@ -146,6 +146,7 @@ export function createHud(mount, {
     return counts;
   }
 
+  /** Whether another stone of this colour can go onto the pick. */
   function canAddGem(gem) {
     if (!view || !isMyTurn() || view.phase !== 'playing') return { ok: false, why: 'Not your turn.' };
     if (gem === GOLD) return { ok: false, why: 'Doubloons only come from stowing a card.' };
@@ -165,6 +166,42 @@ export function createHud(mount, {
     if (total >= 3) return { ok: false, why: 'Three gems at most.' };
     if (total === 2 && distinct === 1) return { ok: false, why: 'You are taking two of a kind.' };
     return { ok: true };
+  }
+
+  /**
+   * Clicking a pile you have already picked puts the stone back — the
+   * one exception being a lone colour that could still become a pair,
+   * where the second click takes the pair instead.
+   */
+  function toggleGem(gem) {
+    if (!view || !isMyTurn() || view.phase !== 'playing') {
+      play('deny');
+      toast('Wait for your turn.', 'bad', 1500);
+      return;
+    }
+
+    const counts = pendingCounts();
+    const held = counts[gem] || 0;
+    const distinct = Object.keys(counts).length;
+    const supply = view.supply[gem] || 0;
+
+    if (held > 0) {
+      const couldPair = held === 1 && distinct === 1 && supply >= 4;
+      if (couldPair) {
+        pending.push(gem);
+        play('token');
+      } else {
+        // Drop the colour entirely. Removing one at a time would just
+        // bounce between one and two on a lone colour.
+        pending = pending.filter((g) => g !== gem);
+        play('cardSlide');
+      }
+      refreshActionBar();
+      refreshBoardHighlights();
+      return;
+    }
+
+    addGem(gem);
   }
 
   function addGem(gem) {
@@ -205,7 +242,7 @@ export function createHud(mount, {
 
     if (pick.kind === 'token') {
       if (!isMyTurn()) { play('deny'); toast('Wait for your turn.', 'bad', 1500); return; }
-      addGem(pick.token);
+      toggleGem(pick.token);
       return;
     }
 
@@ -643,7 +680,12 @@ export function createHud(mount, {
     const isTwo = distinct === 1 && pending.length === 2;
 
     let hint = 'Click gem piles on the table, or press 1–5.';
-    if (pending.length === 1) hint = 'Two more of other colours — or the same one again for a pair.';
+    if (pending.length === 1) {
+      const gem = pending[0];
+      hint = (view.supply[gem] || 0) >= 4
+        ? 'Two more colours — or this one again for a pair. Click it twice more to put it back.'
+        : 'Two more colours. Click a picked pile to put it back.';
+    }
     if (pending.length === 2 && !isTwo) hint = 'One more colour, or confirm as is.';
     if (isTwo) hint = 'Two of a kind. Ready when you are.';
     if (pending.length === 3) hint = 'Three colours. Ready when you are.';
@@ -678,7 +720,8 @@ export function createHud(mount, {
     if (view && settings.gameplay.showLegalOnly && isMyTurn() && view.phase === 'playing') {
       const player = me();
       for (const token of ALL_TOKENS) {
-        if (token === GOLD || !canAddGem(token).ok) dim.add(`token:${token}`);
+        const picked = pending.includes(token);
+        if (token === GOLD || (!picked && !canAddGem(token).ok)) dim.add(`token:${token}`);
       }
       for (const tier of [1, 2, 3]) {
         for (const card of view.board[tier]) {
@@ -1038,7 +1081,7 @@ export function createHud(mount, {
     if (promptOverlay) return;
 
     const index = '12345'.indexOf(event.key);
-    if (index >= 0) { addGem(GEMS[index]); return; }
+    if (index >= 0) { toggleGem(GEMS[index]); return; }
 
     if (event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter') {
       confirmGems();
