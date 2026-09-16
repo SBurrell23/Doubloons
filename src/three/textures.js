@@ -415,7 +415,7 @@ export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
   // Standing on the jaw, less a hair: sitting exactly on the bone's
   // foot the count read as though it had slipped off the bottom.
   const baseline = cy - size / 2 + size * (SKULL_MARK_FOOT - 0.035);
-  let x = left + size * 0.86;
+  let x = left + size * 0.93;
   const stamp = (text, fontSize) => {
     ctx.font = `700 ${Math.round(fontSize)}px Cinzel, Georgia, serif`;
     ctx.strokeText(text, x, baseline);
@@ -423,7 +423,7 @@ export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
     x += ctx.measureText(text).width;
   };
   stamp('\u00d7', size * 0.44);
-  x += size * 0.06;
+  x += size * 0.11;
   stamp(String(count), size * 0.62);
 
   ctx.restore();
