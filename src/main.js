@@ -25,7 +25,10 @@ import {
   startAmbience, stopAmbience, ambienceRunning,
 } from './audio/sfx.js';
 import { startMusic, stopMusic, nudgeMusic, syncVolume } from './audio/music.js';
-import { HostSession, ClientSession, SoloSession, cleanName } from './game/session.js';
+import {
+  HostSession, ClientSession, SoloSession, cleanName,
+  loadHostSnapshot, forgetHostSnapshot,
+} from './game/session.js';
 
 const sceneMount = document.getElementById('scene');
 const uiMount = document.getElementById('ui');
@@ -204,6 +207,9 @@ function teardownGame() {
 function showTitle() {
   screen = 'title';
   teardownGame();
+  heldForOthers = [];
+  heldForSelf = false;
+  refreshHeld();
   if (session) { session.leave(); session = null; }
   clear(uiMount);
 
@@ -216,10 +222,15 @@ function showTitle() {
   renderTitle(uiMount, {
     name: settings.profile.name,
     joinCodeFromUrl: joinCode.toUpperCase(),
+    // A voyage this tab was hosting when it reloaded. The crew is still
+    // out there holding the same room code.
+    resumable: loadHostSnapshot(),
     onNameChange: (value) => updateSettings({ profile: { name: value } }),
     onSolo: () => startSolo(),
     onHost: (status) => hostGame(status),
     onJoin: (code, status) => joinGame(code, status),
+    onResume: (status) => resumeHosting(status),
+    onDiscardResume: () => { forgetHostSnapshot(); showTitle(); },
     onHowTo: () => openHowToPlay(),
     onSettings: () => showSettings(),
   });
@@ -273,6 +284,26 @@ async function joinGame(code, status) {
   }
 }
 
+async function resumeHosting(status) {
+  unlockAudio();
+  const snap = loadHostSnapshot();
+  if (!snap) { showTitle(); return; }
+  status.classList.remove('is-bad');
+  status.textContent = 'Reclaiming the room…';
+  try {
+    session = await HostSession.resume(snap);
+    wireSession();
+    if (session.phase === 'playing' && session.view) showTable();
+    else showLobby();
+  } catch (error) {
+    console.error(error);
+    session = null;
+    status.classList.add('is-bad');
+    status.textContent = describeNetError(error);
+    play('deny');
+  }
+}
+
 function describeNetError(error) {
   const message = String(error?.message || error?.type || error || '');
   if (/peer-unavailable|No room/i.test(message)) return 'No room with that code is open right now.';
@@ -284,6 +315,9 @@ function describeNetError(error) {
 
 function showLobby() {
   screen = 'lobby';
+  heldForOthers = [];
+  heldForSelf = false;
+  refreshHeld();
   teardownGame();
   clear(uiMount);
 
@@ -395,17 +429,36 @@ function wireSession() {
     hud?.toast(text, kind);
   });
 
-  session.on('paused', (waiting) => showHeld(waiting));
+  session.on('paused', (waiting, until) => {
+    heldForOthers = waiting || [];
+    graceUntil = until || 0;
+    refreshHeld();
+  });
 
   session.on('status', (status) => {
     // 'reconnecting' is only the signalling socket blinking, which the
     // game does not care about; 'rejoining' means our channel is gone.
-    if (status === 'rejoining') showHeld(['you'], { self: true });
-    else if (status === 'connected') showHeld([]);
+    if (status === 'rejoining') { heldForSelf = true; refreshHeld(); }
+    else if (status === 'connected') { heldForSelf = false; refreshHeld(); }
+  });
+
+  // The host's own line to the matchmaker. The game carries on without
+  // it, but nobody can rejoin until it is back, which is worth saying.
+  session.on('netStatus', (status) => {
+    if (status === 'offline' || status === 'closed') {
+      hud?.toast('Trouble reaching the matchmaking server — the game is fine, but nobody can rejoin until it is back.', 'bad');
+    } else if (status === 'online') {
+      hud?.toast('Back in touch with the matchmaking server.', 'good');
+    }
   });
 
   session.on('lost', (reason) => {
     play('deny');
+    // We have stopped looking, so the "finding the table" panel has to
+    // go or it sits behind this one still claiming to be trying.
+    heldForSelf = false;
+    heldForOthers = [];
+    refreshHeld();
     showDisconnected(reason);
   });
 
@@ -420,8 +473,19 @@ function wireSession() {
  * decides the voyage cannot wait any longer.
  */
 let heldOverlay = null;
-function showHeld(waiting, { self = false } = {}) {
-  if (!waiting || !waiting.length) {
+let heldForOthers = [];
+let heldForSelf = false;
+let graceUntil = 0;
+let graceTicker = 0;
+
+function refreshHeld() {
+  // Our own line parting takes precedence: there is nothing useful to
+  // say about the rest of the table while we cannot see it.
+  const self = heldForSelf;
+  const waiting = self ? [] : heldForOthers;
+  if (!self && !waiting.length) {
+    clearInterval(graceTicker);
+    graceTicker = 0;
     heldOverlay?.remove();
     heldOverlay = null;
     return;
@@ -429,7 +493,7 @@ function showHeld(waiting, { self = false } = {}) {
   if (screen !== 'table') return;
   heldOverlay?.remove();
 
-  const names = self ? null : waiting.join(' and ');
+  const countdown = el('p.panel__sub.held__clock');
   const canCover = !self && session?.isHost && typeof session.coverForAdrift === 'function';
 
   heldOverlay = el('div.overlay', {},
@@ -437,33 +501,82 @@ function showHeld(waiting, { self = false } = {}) {
       el('h2.panel__title', {}, self ? 'Finding the table' : 'The voyage is held'),
       el('p.panel__sub', {}, self
         ? 'Your line to the host parted. Trying to pick it back up — your seat and cards are waiting.'
-        : `Waiting for ${names} to come back aboard. Nobody is playing their hand.`),
+        : `Waiting for ${waiting.join(' and ')} to come back aboard. Nobody is playing their hand.`),
       session?.code && !self
         ? el('p.panel__sub', {}, 'They can rejoin with the same code: ', el('b', {}, session.code))
         : null,
+      self ? null : countdown,
       canCover
         ? el('div.modal__foot', {},
           button('Sail without them', {
             class: 'btn--ghost',
-            onClick: () => { session.coverForAdrift(); showHeld([]); },
+            onClick: () => { session.coverForAdrift(); },
           }),
         )
         : null,
     ),
   );
   document.body.append(heldOverlay);
+
+  // Nobody waits in silence: say how long the table will hold.
+  clearInterval(graceTicker);
+  graceTicker = 0;
+  if (!self && graceUntil) {
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((graceUntil - Date.now()) / 1000));
+      countdown.textContent = left
+        ? `The crew takes over in ${left}s if they are not back.`
+        : 'Sailing on without them…';
+    };
+    tick();
+    graceTicker = setInterval(tick, 500);
+  }
 }
 
+let adriftOverlay = null;
 function showDisconnected(reason) {
-  const overlay = el('div.overlay', {},
+  // A drop and a kick can both land; one panel is enough.
+  adriftOverlay?.remove();
+  const dropped = session;
+  const canRetry = dropped && !dropped.isHost && typeof dropped.retry === 'function' && dropped.code;
+  const status = el('p.panel__sub');
+
+  const overlay = adriftOverlay = el('div.overlay', {},
     el('div.panel.modal', { style: { '--modal-w': '440px' } },
       el('h2.panel__title', {}, 'Cast adrift'),
       el('p.panel__sub', {}, reason),
+      canRetry
+        ? el('p.panel__sub', {}, 'Your seat is held as long as the table is still sailing. ',
+          el('b', {}, dropped.code), ' will take you back to it.')
+        : null,
+      status,
       el('div.modal__foot', {},
         button('Back to the docks', {
-          class: 'btn--gold',
-          onClick: () => { overlay.remove(); showTitle(); },
+          class: 'btn--ghost',
+          onClick: () => { overlay.remove(); adriftOverlay = null; showTitle(); },
         }),
+        canRetry
+          ? button('Try the room again', {
+            class: 'btn--gold',
+            onClick: async (event) => {
+              const btn = event.currentTarget;
+              btn.disabled = true;
+              status.classList.remove('is-bad');
+              status.textContent = 'Rowing back over…';
+              try {
+                await dropped.retry();
+                overlay.remove();
+                adriftOverlay = null;
+                status.textContent = '';
+              } catch (error) {
+                btn.disabled = false;
+                status.classList.add('is-bad');
+                status.textContent = describeNetError(error);
+                play('deny');
+              }
+            },
+          })
+          : null,
       ),
     ),
   );
@@ -500,8 +613,19 @@ document.addEventListener('visibilitychange', () => {
   else world?.start();
 });
 
-window.addEventListener('beforeunload', () => {
-  session?.leave();
+/*
+ * A closing tab and a refresh look exactly the same from here, so treat
+ * every one as a refresh: let go of the connection but keep the claim
+ * on the seat -- or, for a host, the saved voyage. Somebody who really
+ * has gone is covered by the host's grace clock instead.
+ */
+window.addEventListener('pagehide', (event) => {
+  // A page put in the back/forward cache is coming back with everything
+  // still wired up; the liveness clock picks the channel up again by
+  // itself, so there is nothing to tear down here.
+  if (event.persisted) return;
+  if (typeof session?.detach === 'function') session.detach();
+  else session?.leave();
 });
 
 // A handle for poking at the running game from the console.

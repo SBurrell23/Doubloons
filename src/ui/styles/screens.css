@@ -497,3 +497,39 @@
 .boot__msg { margin-top: 0.8rem; font-style: italic; font-size: 0.86rem; opacity: 0.8; }
 
 .log--collapsed .log__list { display: none; }
+
+/* A voyage this tab was hosting before it reloaded. */
+.title__resume {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--brass) 55%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--brass) 12%, transparent);
+  text-align: left;
+}
+
+.title__resume-title {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.title__resume .btn {
+  flex: none;
+}
+
+.title__resume-sub {
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+/* How long the table will hold for somebody who is adrift. */
+.held__clock {
+  margin-top: 0.4rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}

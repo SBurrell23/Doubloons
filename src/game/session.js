@@ -21,6 +21,27 @@ const SEAT_EMBLEM_NAMES = ['skull', 'anchor', 'cutlasses', 'wheel'];
 export const MAX_SEATS = 4;
 export const MIN_SEATS = 2;
 
+/**
+ * Liveness. A WebRTC channel can go quiet without ever closing -- a
+ * frozen background tab, a laptop lid, a phone that lost its radio --
+ * and the table would sit there waiting on a player who is not coming.
+ * So both ends talk on a timer, and silence is treated as absence.
+ *
+ * Every value is overridable per session; the netcode simulation winds
+ * them right down so a whole disconnect-and-return cycle fits in a few
+ * milliseconds.
+ */
+export const NET_TIMING = {
+  pulse: 1000,          // how often each end checks the clock
+  heartbeat: 3000,      // client -> host, when it has nothing else to say
+  seatTimeout: 12000,   // host: silence this long means the seat is adrift
+  hostTimeout: 14000,   // client: silence this long means the channel is gone
+  grace: 120000,        // how long the table waits before sailing without them
+  rejoinWindow: 180000, // how long a client keeps trying to get back aboard
+  rejoinDelay: 1200,    // first pause between attempts to get back in
+  aiDelay: null,        // override the crew's thinking time (simulation only)
+};
+
 class Emitter {
   constructor() { this._handlers = new Map(); }
   on(event, fn) {
@@ -63,31 +84,39 @@ export function cleanName(name, fallback = 'Captain') {
 // ------------------------------------------------------------
 
 export class HostSession extends Emitter {
-  constructor({ name, options = {} } = {}) {
+  constructor({ name, options = {}, timing = {}, transport = null, storage = null } = {}) {
     super();
     this.isHost = true;
     this.myId = 'host';
     this.code = null;
     this.phase = 'lobby';
     this.options = { ...DEFAULT_OPTIONS, ...options };
+    this.timing = { ...NET_TIMING, ...timing };
+    this._store = browserStore(storage);
     this.seats = [
       { id: 'host', name: cleanName(name, 'Captain'), isAI: false, peerId: null, connected: true, isHost: true },
     ];
     this._waiting = [];
     this.state = null;
-    this.net = new Host();
+    this.net = transport || new Host();
     this._aiTimer = 0;
     this._timerHandle = 0;
     this._deadline = 0;
     this._autoplayTimer = 0;
     this._chat = [];
+    this._lastHeard = new Map();   // seat id -> when we last heard anything
+    this._graceUntil = 0;
+    this._pulseTimer = 0;
     this._wire();
   }
 
   // ---- lobby ----
 
-  async open() {
-    this.code = await this.net.open();
+  /** `preferred` reclaims the room code of a voyage we are resuming. */
+  async open(preferred = null) {
+    this.code = await this.net.open(preferred);
+    this._startPulse();
+    this._persist();
     this.emit('lobby', this.lobby);
     return this.code;
   }
@@ -104,6 +133,7 @@ export class HostSession extends Emitter {
       })),
       chat: this._chat.slice(-40),
       waiting: this._waiting,
+      graceUntil: this._graceUntil,
     };
   }
 
@@ -118,30 +148,85 @@ export class HostSession extends Emitter {
     this.net.on('disconnect', (peerId) => {
       const seat = this.seats.find((s) => s.peerId === peerId);
       if (!seat) return;
-      if (this.phase === 'lobby') {
-        this.seats = this.seats.filter((s) => s.peerId !== peerId);
-        this.emit('toast', { text: `${seat.name} left the table.`, kind: 'bad' });
-      } else {
-        // Hold the game rather than letting the crew play their hand:
-        // they keep their seat, their cards and their turn until they
-        // are back, or until the host decides to sail without them.
-        seat.connected = false;
-        seat.peerId = null;
-        this.emit('toast', { text: `${seat.name} lost their connection. The voyage waits.`, kind: 'bad' });
-        this._syncPause();
-        this._scheduleTurn();
-      }
-      this._pushLobby();
-      this.emit('lobby', this.lobby);
+      this._seatLost(seat);
     });
 
+    /*
+     * The room had to be rebuilt on the broker, which takes the data
+     * channels with it. Everyone still aboard is now adrift until they
+     * find their way back to the same code.
+     */
+    this.net.on('reopened', () => {
+      const live = this.net.connections;
+      for (const seat of this.seats) {
+        if (seat.isAI || seat.isHost || !seat.peerId) continue;
+        if (live && live.has(seat.peerId)) continue;
+        this._seatLost(seat);
+      }
+    });
+
+    this.net.on('status', (status) => this.emit('netStatus', status));
     this.net.on('error', (error) => this.emit('error', error));
+  }
+
+  /**
+   * A seat we can no longer reach. In the lobby the berth just frees
+   * up; mid-voyage they keep their seat, their cards and their turn --
+   * the whole table holds until they are back, the grace runs out, or
+   * the host decides to sail without them.
+   */
+  _seatLost(seat) {
+    if (!seat || seat.isAI || seat.isHost) return;
+    // The close event, the kick and the silence check can all land on
+    // the same seat; only the first one means anything.
+    if (seat.lost) return;
+    seat.lost = true;
+    if (seat.peerId) this.net.kick(seat.peerId);
+    this._lastHeard.delete(seat.id);
+
+    if (this.phase === 'lobby') {
+      this.seats = this.seats.filter((s) => s !== seat);
+      this.emit('toast', { text: `${seat.name} left the table.`, kind: 'bad' });
+      this._pushLobby();
+      this.emit('lobby', this.lobby);
+      this._persist();
+      return;
+    }
+
+    seat.connected = false;
+    seat.peerId = null;
+
+    if (seat.departed) {
+      // They said goodbye rather than dropping. No sense holding the
+      // table for someone who is not coming back.
+      this._coverSeats([seat], `${seat.name} left the voyage — the crew takes their seat.`);
+      return;
+    }
+
+    this.emit('toast', { text: `${seat.name} lost their connection. The voyage waits.`, kind: 'bad' });
+    this._syncPause();
+    this._scheduleTurn();
+    this._pushLobby();
+    this.emit('lobby', this.lobby);
+    this._persist();
   }
 
   _onMessage(peerId, message) {
     if (!message || typeof message !== 'object') return;
+    if (typeof message.type !== 'string') return;
+
+    // Anything at all from a peer counts as a sign of life.
+    const speaker = this.seats.find((s) => s.peerId === peerId);
+    if (speaker) this._lastHeard.set(speaker.id, Date.now());
 
     switch (message.type) {
+      case MSG.PING: {
+        this.net.send(peerId, { type: MSG.PONG, t: message.t });
+        return;
+      }
+
+      case MSG.ACK: return;  // already counted above
+
       case MSG.HELLO: {
         const existing = this.seats.find((s) => s.peerId === peerId);
         if (existing) return;
@@ -155,11 +240,15 @@ export class HostSession extends Emitter {
           const stale = held.peerId;
           held.peerId = peerId;
           held.connected = true;
+          held.departed = false;
+          held.lost = false;
+          this._lastHeard.set(held.id, Date.now());
           if (stale && stale !== peerId) this.net.kick(stale);
           this.net.send(peerId, { type: MSG.SEATED, seatId: held.id, token: held.token });
           this.emit('toast', { text: `${held.name} is back aboard.`, kind: 'good', sound: 'join' });
           this._pushLobby();
           this.emit('lobby', this.lobby);
+          this._persist();
           if (this.phase === 'playing' && this.state) {
             this.net.send(peerId, {
               type: MSG.STATE,
@@ -191,10 +280,12 @@ export class HostSession extends Emitter {
           token: newToken(),
         };
         this.seats.push(seat);
+        this._lastHeard.set(seat.id, Date.now());
         this.net.send(peerId, { type: MSG.SEATED, seatId: seat.id, token: seat.token });
         this.emit('toast', { text: `${name} joined the table.`, kind: 'good', sound: 'join' });
         this._pushLobby();
         this.emit('lobby', this.lobby);
+        this._persist();
         break;
       }
 
@@ -210,6 +301,13 @@ export class HostSession extends Emitter {
       case MSG.CHAT: {
         const seat = this.seats.find((s) => s.peerId === peerId);
         if (!seat) return;
+        if (typeof message.text !== 'string') return;
+        // A client stuck in a send loop should not be able to push the
+        // whole table's chat history out from under everyone.
+        const now = Date.now();
+        const last = seat._lastChat || 0;
+        if (now - last < 400) return;
+        seat._lastChat = now;
         this._addChat(seat.name, message.text);
         break;
       }
@@ -222,7 +320,12 @@ export class HostSession extends Emitter {
       }
 
       case MSG.LEAVE: {
+        const seat = this.seats.find((s) => s.peerId === peerId);
+        // Mark the intent before the channel closes, so the drop is
+        // read as a goodbye rather than as somebody to wait for.
+        if (seat) seat.departed = true;
         this.net.kick(peerId);
+        if (seat) this._seatLost(seat);
         break;
       }
     }
@@ -306,9 +409,12 @@ export class HostSession extends Emitter {
       Date.now() ^ (Math.random() * 0xffffffff),
     );
     this._waiting = [];
+    this._graceUntil = 0;
+    this._startPulse();
     this._pushLobby();
     this._broadcastState({ reset: true });
     this._syncPause();
+    this._persist();
     this._scheduleTurn();
     return true;
   }
@@ -320,9 +426,16 @@ export class HostSession extends Emitter {
     this.phase = 'lobby';
     this.state = null;
     this._waiting = [];
+    this._graceUntil = 0;
+    // Anyone who never made it back does not get a berth in the next
+    // game -- otherwise the rematch starts held, waiting on a seat that
+    // has nobody behind it.
+    const stranded = this.seats.filter((s) => !s.isAI && !s.isHost && !s.connected);
+    if (stranded.length) this.seats = this.seats.filter((s) => !stranded.includes(s));
     this._pushLobby();
     this.emit('lobby', this.lobby);
     this.net.broadcast({ type: MSG.LOBBY, lobby: this.lobby });
+    this._persist();
   }
 
   // ---- gameplay ----
@@ -333,23 +446,50 @@ export class HostSession extends Emitter {
       if (playerId === this.myId) this.emit('reject', 'The voyage is held until the crew is back aboard.');
       return;
     }
-    const result = validate(this.state, playerId, action);
-    if (!result.ok) {
-      if (playerId === this.myId) this.emit('reject', result.reason);
-      else {
-        const seat = this.seats.find((s) => s.id === playerId);
-        if (seat?.peerId) this.net.send(seat.peerId, { type: MSG.REJECT, reason: result.reason });
-      }
+
+    let result;
+    try {
+      result = validate(this.state, playerId, action);
+    } catch (error) {
+      // The rules engine is meant to tolerate any shape at all, but a
+      // throw here would take the host's message loop with it and
+      // strand everyone. Refuse the move and carry on.
+      console.error('[session] validate threw', error);
+      this._reject(playerId, 'That move could not be read.');
       return;
     }
-    const effects = apply(this.state, playerId, action);
+    if (!result.ok) {
+      this._reject(playerId, result.reason);
+      return;
+    }
+
+    let effects;
+    try {
+      effects = apply(this.state, playerId, action);
+    } catch (error) {
+      console.error('[session] apply threw', error);
+      this._reject(playerId, 'That move could not be played.');
+      // The state may be half-written, so make sure everyone is looking
+      // at whatever it actually is now rather than a stale snapshot.
+      this._broadcastState({ reset: true });
+      this._scheduleTurn();
+      return;
+    }
+
     this._broadcastState({ effects });
+    this._persist();
     if (this.state.phase === 'finished') {
       this._clearTimers();
       this.emit('gameOver', standings(this.state));
     } else {
       this._scheduleTurn();
     }
+  }
+
+  _reject(playerId, reason) {
+    if (playerId === this.myId) { this.emit('reject', reason); return; }
+    const seat = this.seats.find((s) => s.id === playerId);
+    if (seat?.peerId) this.net.send(seat.peerId, { type: MSG.REJECT, reason });
   }
 
   /** Who the game is waiting on right now. */
@@ -361,45 +501,95 @@ export class HostSession extends Emitter {
 
   /** Human seats that have dropped and not yet come back. */
   _adrift() {
-    if (this.phase !== 'playing') return [];
+    if (this.phase !== 'playing' || !this.state) return [];
+    if (this.state.phase === 'finished') return [];
     return this.seats.filter((s) => !s.isAI && !s.connected && !s.isHost);
   }
 
   get paused() { return this._adrift().length > 0; }
 
+  /** When the table stops waiting and sails on without them. */
+  get graceUntil() { return this._graceUntil; }
+
   /** Tell everyone whether the table is held, but only when it changes. */
   _syncPause() {
     const waiting = this._adrift().map((s) => s.name);
+
+    // The grace clock starts the moment the table first goes quiet and
+    // runs until it is whole again -- dropping, returning and dropping
+    // again does not buy the table another full wait.
+    if (waiting.length && !this._graceUntil) this._graceUntil = Date.now() + this.timing.grace;
+    else if (!waiting.length) this._graceUntil = 0;
+
     const same = waiting.length === this._waiting.length
       && waiting.every((n, i) => n === this._waiting[i]);
     if (same) return;
     this._waiting = waiting;
-    this.net.broadcast({ type: MSG.PAUSE, waiting });
-    this.emit('paused', waiting);
+    this.net.broadcast({ type: MSG.PAUSE, waiting, until: this._graceUntil });
+    this.emit('paused', waiting, this._graceUntil);
   }
 
   /**
    * Give up on someone who is not coming back: the crew takes their
-   * seat for the rest of the voyage. Host-only, and never automatic --
-   * a dropped player gets their hand back if they reconnect first.
+   * seat for the rest of the voyage. The host can call it early from
+   * the held overlay; otherwise the grace clock calls it, because a
+   * table that waits forever is a game nobody gets to finish.
    */
   coverForAdrift() {
-    const adrift = this._adrift();
-    if (!adrift.length) return;
-    for (const seat of adrift) {
+    this._coverSeats(this._adrift());
+  }
+
+  _coverSeats(seats, message = null) {
+    const taking = seats.filter((s) => !s.isAI && !s.isHost);
+    if (!taking.length) return;
+    for (const seat of taking) {
       seat.isAI = true;
       seat.aiLevel = seat.aiLevel || 'sly';
       seat.connected = true;
+      seat.departed = false;
+      seat.lost = false;
       seat.token = null;
+      this._lastHeard.delete(seat.id);
       const player = this.state?.players.find((p) => p.id === seat.id);
       if (player) player.isAI = true;
-      this.emit('toast', { text: `The crew takes ${seat.name}'s seat.`, kind: 'bad' });
+      this.emit('toast', {
+        text: message || `The crew takes ${seat.name}'s seat.`,
+        kind: 'bad',
+      });
     }
+    this._graceUntil = 0;
     this._pushLobby();
     this.emit('lobby', this.lobby);
     this._syncPause();
     this._broadcastState({});
+    this._persist();
     this._scheduleTurn();
+  }
+
+  // ---- liveness ----
+
+  /**
+   * One slow clock covers both things that can quietly go wrong: a
+   * channel that stopped carrying traffic without ever closing, and a
+   * grace period that has run out.
+   */
+  _startPulse() {
+    if (this.solo || this._pulseTimer) return;
+    this._pulseTimer = setInterval(() => this._pulse(), this.timing.pulse);
+  }
+
+  _pulse() {
+    const now = Date.now();
+
+    for (const seat of this.seats) {
+      if (seat.isAI || seat.isHost || !seat.connected || !seat.peerId) continue;
+      const last = this._lastHeard.get(seat.id) ?? now;
+      if (now - last > this.timing.seatTimeout) this._seatLost(seat);
+    }
+
+    if (this._graceUntil && Date.now() >= this._graceUntil && this.paused) {
+      this.coverForAdrift();
+    }
   }
 
   _scheduleTurn() {
@@ -420,7 +610,8 @@ export class HostSession extends Emitter {
     if (!seat) return;
 
     if (seat.isAI) {
-      this._aiTimer = setTimeout(() => this._playAi(actorId), aiDelay(this.options.aiSpeed));
+      const think = this.timing.aiDelay ?? aiDelay(this.options.aiSpeed);
+      this._aiTimer = setTimeout(() => this._playAi(actorId), think);
       return;
     }
 
@@ -494,8 +685,110 @@ export class HostSession extends Emitter {
 
   leave() {
     this._clearTimers();
+    clearInterval(this._pulseTimer);
+    this._pulseTimer = 0;
+    forgetHostSnapshot(this._store);
     this.net.destroy();
   }
+
+  /**
+   * The tab is closing, which for a host may only mean a refresh. Let
+   * go of the room but leave the saved voyage where the next load can
+   * find it.
+   */
+  detach() {
+    this._persist();
+    this._clearTimers();
+    clearInterval(this._pulseTimer);
+    this._pulseTimer = 0;
+    this.net.destroy();
+  }
+
+  // ---- surviving the host's own reload ----
+
+  /**
+   * Everything needed to put this table back together. The host is the
+   * only copy of the game, so a stray refresh used to end it for all
+   * four players; the snapshot rides in sessionStorage and the room
+   * code is reclaimed on the way back.
+   */
+  snapshot() {
+    if (this.solo || !this.code || !this.state) return null;
+    return {
+      v: 1,
+      at: Date.now(),
+      code: this.code,
+      phase: this.phase,
+      options: this.options,
+      name: this.seats[0]?.name,
+      // Peer ids belong to connections that will not survive the
+      // reload; the tokens are what bring people back to their seats.
+      seats: this.seats.map((seat) => ({
+        ...seat, peerId: null, lost: false,
+        connected: !!(seat.isAI || seat.isHost),
+      })),
+      state: this.state,
+      chat: this._chat.slice(-40),
+    };
+  }
+
+  _persist() {
+    if (this.solo || !this.code) return;
+    const snap = this.snapshot();
+    // Back in the lobby there is no voyage to come back to, and leaving
+    // the last one in storage would offer a finished game after a
+    // reload.
+    if (!snap) { forgetHostSnapshot(this._store); return; }
+    storeHostSnapshot(this._store, snap);
+  }
+
+  /**
+   * Rebuild a host from a snapshot and reclaim its room code. Everyone
+   * else is already looping on that code, so they come back by
+   * themselves.
+   */
+  static async resume(snap, { timing = {}, transport = null, storage = null } = {}) {
+    const session = new HostSession({ name: snap.name, options: snap.options, timing, transport, storage });
+    session.phase = snap.phase;
+    session.seats = snap.seats.map((seat) => ({ ...seat }));
+    session.state = snap.state;
+    session._chat = snap.chat || [];
+    await session.open(snap.code);
+    if (session.phase === 'playing' && session.state) {
+      session._syncPause();
+      session._broadcastState({ reset: true });
+      session._scheduleTurn();
+    }
+    session.emit('lobby', session.lobby);
+    return session;
+  }
+}
+
+// A voyage in progress, parked where a reload can find it again. Same
+// storage as the seat tokens: a refresh keeps it, a new tab does not.
+const HOST_KEY = 'dbln-host';
+export const HOST_SNAPSHOT_TTL = 20 * 60 * 1000;
+
+function storeHostSnapshot(store, snap) {
+  if (!snap) return;
+  try { store?.setItem(HOST_KEY, JSON.stringify(snap)); } catch { /* no storage */ }
+}
+
+export function loadHostSnapshot(storage = null) {
+  const store = browserStore(storage);
+  try {
+    const raw = store?.getItem(HOST_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (!snap || snap.v !== 1 || !snap.code || !snap.state) return null;
+    if (Date.now() - (snap.at || 0) > HOST_SNAPSHOT_TTL) { forgetHostSnapshot(store); return null; }
+    return snap;
+  } catch { return null; }
+}
+
+export function forgetHostSnapshot(storage = null) {
+  const store = browserStore(storage);
+  try { store?.removeItem(HOST_KEY); } catch { /* no storage */ }
 }
 
 // ------------------------------------------------------------
@@ -503,13 +796,14 @@ export class HostSession extends Emitter {
 // ------------------------------------------------------------
 
 export class ClientSession extends Emitter {
-  constructor({ name } = {}) {
+  constructor({ name, timing = {}, transport = null, storage = null } = {}) {
     super();
     this.isHost = false;
     this.myId = null;
     this.myName = cleanName(name, 'Deckhand');
     this.code = null;
     this.phase = 'lobby';
+    this.timing = { ...NET_TIMING, ...timing };
     this._lobby = { code: null, phase: 'lobby', options: { ...DEFAULT_OPTIONS }, seats: [], chat: [] };
     this._view = null;
     this._deadline = 0;
@@ -517,13 +811,26 @@ export class ClientSession extends Emitter {
     this._left = false;
     this._rejoining = false;
     this._waiting = [];
-    this.net = new Client();
+    this._graceUntil = 0;
+    this._lastHeard = 0;
+    this._pulseTimer = 0;
+    this._store = browserStore(storage);
+    this._makeTransport = transport || (() => new Client());
+    this.net = this._makeTransport();
   }
 
   _wireNet() {
-    this.net.on('message', (message) => this._onMessage(message));
+    this.net.on('message', (message) => {
+      this._lastHeard = Date.now();
+      this._onMessage(message);
+    });
     this.net.on('disconnect', () => this._onDrop());
-    this.net.on('kicked', () => { this._left = true; this.emit('lost', 'The host closed your seat.'); });
+    this.net.on('kicked', () => {
+      this._left = true;
+      this._stopPulse();
+      forgetToken(this._store, this.code);
+      this.emit('lost', 'The host closed your seat.');
+    });
     this.net.on('status', (status) => this.emit('status', status));
   }
 
@@ -534,10 +841,39 @@ export class ClientSession extends Emitter {
     this._wireNet();
     await this.net.connect(code);
     this.code = code;
-    this.myId = this.net.peer.id;
-    this._token = readToken(code);
+    this.myId = this.net.peer?.id || this.myId;
+    this._token = readToken(this._store, code) || this._token;
+    this._lastHeard = Date.now();
     this.net.send({ type: MSG.HELLO, name: this.myName, token: this._token });
+    this._startPulse();
     return code;
+  }
+
+  /**
+   * The other half of the host's liveness clock. A channel that has
+   * gone quiet without closing looks exactly like a working one, so
+   * say something on a timer and treat a long silence as a drop.
+   */
+  _startPulse() {
+    if (this._pulseTimer) return;
+    this._pulseTimer = setInterval(() => {
+      if (this._left) return;
+      const quiet = Date.now() - this._lastHeard;
+      if (!this._rejoining && quiet > this.timing.hostTimeout) {
+        // Nothing has come back for a long time. Assume the channel is
+        // dead even though nobody said so, and go looking for the room.
+        this._onDrop();
+        return;
+      }
+      if (!this._rejoining && quiet > this.timing.heartbeat) {
+        this.net.send({ type: MSG.PING, t: Date.now() });
+      }
+    }, this.timing.pulse);
+  }
+
+  _stopPulse() {
+    clearInterval(this._pulseTimer);
+    this._pulseTimer = 0;
   }
 
   /**
@@ -551,14 +887,20 @@ export class ClientSession extends Emitter {
     this._rejoining = true;
     this.emit('status', 'rejoining');
 
-    for (let attempt = 0; attempt < 10 && !this._left; attempt++) {
-      await sleep(attempt < 3 ? 1200 : 4000);
+    // Keep at it for minutes, not seconds. The host may simply have
+    // refreshed: they have to load the page again and reclaim the room
+    // code from the broker before anyone can get back in.
+    const until = Date.now() + this.timing.rejoinWindow;
+    for (let attempt = 0; Date.now() < until && !this._left; attempt++) {
+      const base = this.timing.rejoinDelay;
+      await sleep(Math.min(base * 4, base + attempt * base * 0.5));
       if (this._left) break;
       try {
-        this.net.destroy();
-        this.net = new Client();
+        try { this.net.destroy(); } catch { /* already gone */ }
+        this.net = this._makeTransport();
         this._wireNet();
         await this.net.connect(this.code);
+        this._lastHeard = Date.now();
         this.net.send({ type: MSG.HELLO, name: this.myName, token: this._token });
         this._rejoining = false;
         this.emit('status', 'connected');
@@ -569,7 +911,23 @@ export class ClientSession extends Emitter {
     }
 
     this._rejoining = false;
-    if (!this._left) this.emit('lost', 'The connection to the host dropped.');
+    if (!this._left) {
+      this._stopPulse();
+      // The seat token is deliberately left alone: as long as the host
+      // is still holding the table, typing the code in again picks the
+      // same hand back up.
+      this.emit('lost', 'The connection to the host dropped.');
+    }
+  }
+
+  /** Try the room again by hand, after giving up or being told to wait. */
+  async retry() {
+    if (!this.code) throw new Error('No room to go back to.');
+    this._left = false;
+    this._rejoining = false;
+    try { this.net.destroy(); } catch { /* already gone */ }
+    this.net = this._makeTransport();
+    return this.join(this.code);
   }
 
   _onMessage(message) {
@@ -582,22 +940,30 @@ export class ClientSession extends Emitter {
         // The host decides who we are; our peer id is not stable.
         this.myId = message.seatId;
         this._token = message.token || this._token;
-        if (this._token) storeToken(this.code, this._token);
+        if (this._token) storeToken(this._store, this.code, this._token);
         break;
+      case 'pong':
+        break;  // the timestamp on it is all we needed
       case 'pause':
         this._waiting = message.waiting || [];
-        this.emit('paused', this._waiting);
+        this._graceUntil = message.until || 0;
+        this.emit('paused', this._waiting, this._graceUntil);
         break;
       case 'lobby':
-        this._lobby = message.lobby;
-        this.phase = message.lobby.phase;
-        this._waiting = message.lobby.waiting || [];
+        this._lobby = message.lobby || this._lobby;
+        this.phase = this._lobby.phase;
+        this._waiting = this._lobby.waiting || [];
+        this._graceUntil = this._lobby.graceUntil || 0;
         this.emit('lobby', this._lobby);
         break;
       case 'state':
+        if (!message.view) break;
         this.phase = 'playing';
         this._view = message.view;
         this._deadline = message.deadline || 0;
+        // Tells the host we are still here even on a turn we do not act
+        // on, so a quiet player is never mistaken for a lost one.
+        this.net.send({ type: MSG.ACK, version: message.view.version });
         this.emit('state', message.view, { effects: message.effects || [], reset: message.reset });
         if (message.view.phase === 'finished') this.emit('gameOver', message.view.finalStandings);
         break;
@@ -639,28 +1005,55 @@ export class ClientSession extends Emitter {
 
   get paused() { return this._waiting.length > 0; }
   get waiting() { return this._waiting; }
+  get graceUntil() { return this._graceUntil; }
 
+  /** Leaving on purpose. The seat is given up for good. */
   leave() {
     this._left = true;
-    forgetToken(this.code);
-    this.net.send({ type: MSG.LEAVE });
-    this.net.destroy();
+    this._stopPulse();
+    forgetToken(this._store, this.code);
+    const net = this.net;
+    net.clearHandlers?.();   // we are gone; nothing more to react to
+    net.send({ type: MSG.LEAVE });
+    // Tearing the channel down in the same breath used to swallow the
+    // goodbye, and the host would hold the table for someone who had
+    // walked out of the door in front of them.
+    setTimeout(() => { try { net.destroy(); } catch { /* already gone */ } }, 400);
+  }
+
+  /**
+   * The tab is going away, but the player may not be -- a refresh looks
+   * exactly like this. Drop the channel without surrendering the seat,
+   * so reloading lands back in the same chair with the same cards. If
+   * they really have gone, the host's grace clock covers for them.
+   */
+  detach() {
+    this._left = true;
+    this._stopPulse();
+    try { this.net.destroy(); } catch { /* already gone */ }
   }
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Seat tokens live in sessionStorage so a reload rejoins the same seat,
-// but a fresh tab is a fresh player. Private-mode browsers throw here.
+// but a fresh tab is a fresh player. Private-mode browsers throw on the
+// mere mention of it, and the simulation hands in a store of its own.
 const tokenKey = (code) => `dbln-seat-${code}`;
-function readToken(code) {
-  try { return sessionStorage.getItem(tokenKey(code)); } catch { return null; }
+
+export function browserStore(custom = null) {
+  if (custom) return custom;
+  try { return globalThis.sessionStorage || null; } catch { return null; }
 }
-function storeToken(code, token) {
-  try { sessionStorage.setItem(tokenKey(code), token); } catch { /* no storage */ }
+
+function readToken(store, code) {
+  try { return store?.getItem(tokenKey(code)) ?? null; } catch { return null; }
 }
-function forgetToken(code) {
-  try { sessionStorage.removeItem(tokenKey(code)); } catch { /* no storage */ }
+function storeToken(store, code, token) {
+  try { store?.setItem(tokenKey(code), token); } catch { /* no storage */ }
+}
+function forgetToken(store, code) {
+  try { store?.removeItem(tokenKey(code)); } catch { /* no storage */ }
 }
 
 /**
@@ -692,6 +1085,8 @@ export class SoloSession extends HostSession {
     this.emit('lobby', this.lobby);
     return null;
   }
+  _persist() { /* nothing to come back to */ }
+  _startPulse() { /* nobody to keep an eye on */ }
   _pushLobby() { /* nobody to tell */ }
   _broadcastDeadline() { this.emit('deadline', this._deadline); }
   _broadcastState({ effects = [], reset = false } = {}) {
