@@ -3,7 +3,7 @@
 // ============================================================
 
 import {
-  el, button, clear, gemChip, costRow, bonusDisc, infamyPips, infamyCount,
+  el, button, clear, gemChip, costRow, bonusDisc, infamyTimes, infamyCount,
   announce, trapFocus,
 } from './dom.js';
 import { play } from '../audio/sfx.js';
@@ -382,7 +382,7 @@ export function createHud(mount, {
       el('div.inspector__head', {},
         el('div.inspector__name', {}, card.name),
         card.points > 0
-          ? el('div.inspector__points', { tip: '#infamy' }, infamyPips(card.points, { size: 'lg' }))
+          ? el('div.inspector__points', { tip: '#infamy' }, infamyTimes(card.points, { size: 'lg' }))
           : null,
       ),
       el('div.inspector__meta', {},
@@ -493,7 +493,7 @@ export function createHud(mount, {
     const node = el('div.inspector', {},
       el('div.inspector__head', {},
         el('div.inspector__name', {}, lord.name),
-        el('div.inspector__points', { tip: '#infamy' }, infamyPips(LORD_POINTS, { size: 'lg' })),
+        el('div.inspector__points', { tip: '#infamy' }, infamyTimes(LORD_POINTS, { size: 'lg' })),
       ),
       el('div.inspector__meta', {}, lord.title),
       el('div.inspector__cost', {}, ...lines),
@@ -957,7 +957,7 @@ export function createHud(mount, {
           session.submit({ type: 'chooseLord', lordId: lord.id });
         },
       },
-        el('div.lord-option__mark', {}, infamyPips(LORD_POINTS, { size: 'lg' })),
+        el('div.lord-option__mark', {}, infamyTimes(LORD_POINTS, { size: 'lg' })),
         el('div.lord-option__name', {}, lord.name),
         el('div.lord-option__title', {}, lord.title),
         el('div.lord-option__req', {},

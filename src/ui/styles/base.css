@@ -560,37 +560,38 @@ body.gem-white .gem--onyx {
 .bonus-disc--none .bonus-disc__n { color: rgba(233, 220, 189, 0.5); }
 
 /*
- * Infamy is skulls. One per point on anything worth a handful — a card,
- * a Lord — because a row of them is counted at a glance with no digit
- * to find and nothing to tell apart from the bonus beside it. Running
- * totals get one skull and a number instead, since nobody counts
- * fifteen. drawInfamyPips() prints the same row on the cards.
+ * Infamy is a skull and a number: ×3 for what a card or a Lord is
+ * worth, a bare total for what a captain has. The skull is bone with a
+ * dark outline rather than a tinted glyph, so it reads the same on a
+ * parchment panel, a red card and somebody's portrait.
+ * drawInfamyMark() paints the twin on the cards and Lord tiles.
  */
-.infamy-pips {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.08em;
-  font-size: 0.92rem;
-  color: #1b1109;
-  line-height: 1;
+.skull-mark { overflow: visible; }
+.skull-mark__body {
+  fill: #f7ecd2;
+  stroke: #100a05;
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+  paint-order: stroke;
 }
-.infamy-pips__pip { flex: none; filter: drop-shadow(0 0 1px rgba(255, 240, 210, 0.7)); }
+.skull-mark__face { fill: #100a05; }
 
-.infamy-count {
+.infamy-mark {
   display: inline-flex;
   align-items: center;
-  gap: 0.18em;
+  gap: 0.16em;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.92rem;
-  color: #1b1109;
   line-height: 1;
+  color: var(--ink);
 }
-.infamy-count__skull { flex: none; }
-.infamy-count__n { font-size: 1.5em; letter-spacing: -0.01em; }
+.infamy-mark__skull { flex: none; width: 1.75em; height: 1.75em; }
+.infamy-mark__n { font-size: 1.45em; letter-spacing: -0.01em; }
+.infamy-mark--times .infamy-mark__n { font-size: 1.2em; }
 
-.bonus-disc--sm, .infamy-pips--sm, .infamy-count--sm { font-size: 0.74rem; }
-.bonus-disc--lg, .infamy-pips--lg, .infamy-count--lg { font-size: 1.15rem; }
+.bonus-disc--sm, .infamy-mark--sm { font-size: 0.74rem; }
+.bonus-disc--lg, .infamy-mark--lg { font-size: 1.15rem; }
 
 /* ------------------------------------------------------------
    Utility

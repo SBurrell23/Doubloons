@@ -201,22 +201,30 @@
 .players {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  /* Sized to the widest row on a card — the six tokens in hand — so
-     they never wrap and no card trails an empty shelf. --token and
-     --seal step the two seal sizes down together on narrow screens,
-     which is cheaper than letting either one wrap. */
+  gap: 5px;
+  /* Sized to the widest row on a card — the six tokens in hand — plus
+     room for a name and a score beside it. --token and --seal step the
+     two marks down together on narrow screens, which is cheaper than
+     letting either one wrap. The side padding is for the turn glow,
+     which is painted outside the card and would otherwise be shaved
+     off by the scroll box. */
   --token: 0.95rem;
   --seal: 0.98rem;
-  width: 238px;
+  --mark-max: 34px;
+  width: 274px;
   overflow-y: auto;
   max-height: 100%;
-  padding-right: 2px;
+  padding: 3px 5px;
 }
 
+/* A full table is four panels down one side, and they have to fit
+   without a scrollbar. The marks step down a size when the fourth
+   captain sits; two or three players keep the generous ones. */
+.players:has(.player-card:nth-child(4)) { --mark-max: 29px; }
+
 .player-card {
-  --card-pad: 0.72rem;
-  padding: 0.6rem var(--card-pad);
+  --card-pad: 0.66rem;
+  padding: 0.45rem var(--card-pad) 0.4rem;
   background: linear-gradient(180deg, rgba(233, 220, 189, 0.94), rgba(200, 180, 138, 0.94));
   border: 1px solid var(--brass-dark);
   border-radius: var(--radius);
@@ -229,25 +237,28 @@
  * four-player game the thing people actually look at is the panels, so
  * the one on the clock breathes green.
  */
+/* Lime rather than the table's muted verdigris: this one is meant to
+   be seen from across the room, not to blend in. */
 .player-card--active {
-  border-color: var(--verdigris-bright);
-  animation: turn-pulse 1.9s ease-in-out infinite;
+  --turn-glow: #9ee43c;
+  border-color: var(--turn-glow);
+  animation: turn-pulse 1.7s ease-in-out infinite;
 }
 
 @keyframes turn-pulse {
   0%, 100% {
     box-shadow:
       var(--shadow-soft),
-      inset 0 0 0 1px var(--verdigris-bright),
-      0 0 0 1px rgba(79, 154, 126, 0.55),
-      0 0 9px rgba(79, 154, 126, 0.45);
+      inset 0 0 0 1px var(--turn-glow),
+      0 0 0 2px rgba(158, 228, 60, 0.8),
+      0 0 14px rgba(158, 228, 60, 0.6);
   }
   50% {
     box-shadow:
       var(--shadow-soft),
-      inset 0 0 0 1px var(--verdigris-bright),
-      0 0 0 3px rgba(79, 154, 126, 0.75),
-      0 0 22px rgba(79, 154, 126, 0.8);
+      inset 0 0 0 2px var(--turn-glow),
+      0 0 0 4px rgba(158, 228, 60, 1),
+      0 0 30px rgba(158, 228, 60, 0.95);
   }
 }
 
@@ -256,15 +267,15 @@
     animation: none;
     box-shadow:
       var(--shadow-soft),
-      inset 0 0 0 1px var(--verdigris-bright),
-      0 0 0 2px rgba(79, 154, 126, 0.7);
+      inset 0 0 0 2px var(--turn-glow),
+      0 0 0 3px rgba(158, 228, 60, 0.9);
   }
 }
 .player-card--winner { box-shadow: var(--shadow-soft), inset 0 0 0 2px var(--brass-bright); }
 
 /* Tight gaps: the header has to fit a name, a badge and an infamy seal
    beside each other. */
-.player-card__head { display: flex; align-items: center; gap: 0.28rem; margin-bottom: 0.4rem; }
+.player-card__head { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.32rem; }
 .player-card__emblem {
   width: 26px; height: 26px; flex: none;
   border-radius: 2px;
@@ -297,7 +308,7 @@
   padding: 1px 4px;
 }
 /* The score: one skull and a running total. */
-.player-card .infamy-count { font-size: var(--seal); }
+.player-card .infamy-mark { font-size: var(--seal); }
 
 /*
  * Tokens in hand and the bonuses below them share one six-column grid,
@@ -312,12 +323,14 @@
   grid-template-columns: repeat(6, 1fr);
   gap: 3px;
 }
-.player-card__gems { margin-bottom: 6px; }
+.player-card__gems { margin-bottom: 4px; }
 .player-card__gems .gem,
 .bonus-tally .bonus-disc {
   width: 100%;
+  max-width: var(--mark-max);
   height: auto;
   aspect-ratio: 1;
+  justify-self: center;
 }
 .player-card__gems .gem { font-size: var(--token); }
 
@@ -328,26 +341,26 @@
  * it discounts.
  */
 .bonus-tally {
-  margin: 5px calc(-1 * var(--card-pad)) 6px;
-  padding: 4px var(--card-pad) 5px;
+  margin: 4px calc(-1 * var(--card-pad)) 4px;
+  padding: 3px var(--card-pad) 4px;
   background: rgba(36, 24, 17, 0.14);
   border-top: 1px solid rgba(107, 82, 34, 0.35);
   border-bottom: 1px solid rgba(107, 82, 34, 0.35);
 }
+/* The label rides beside the row rather than above it: four panels
+   have to fit down the side without a scrollbar, and a line of small
+   caps is a line of height each one does not have to spare. */
 .bonus-tally__label {
-  display: block;
-  font-family: var(--font-display);
-  font-size: 0.56rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-  margin-bottom: 3px;
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .bonus-tally .bonus-disc { font-size: var(--seal); }
 
 .player-card__stat {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-  font-size: 0.78rem; color: var(--ink-soft); font-style: italic;
+  font-size: 0.74rem; color: var(--ink-soft); font-style: italic;
 }
 .player-card__stat .icon { opacity: 0.7; }
 
@@ -417,12 +430,8 @@
 }
 /* The inspector's badge is dark, so its skulls are bone rather than
    black and want no pale halo behind them. */
-.inspector__points .infamy-pips {
-  font-size: 1rem;
-  color: var(--parchment);
-}
-.inspector__points .infamy-pips__pip { filter: none; }
-.results__score .infamy-count { justify-content: flex-end; }
+.inspector__points .infamy-mark { font-size: 0.95rem; color: var(--parchment); }
+.results__score .infamy-mark { justify-content: flex-end; }
 .inspector__points {
   font-family: var(--font-display);
   font-weight: 700;
@@ -645,7 +654,7 @@
 }
 .lord-option:hover { transform: translateY(-3px); border-color: var(--brass); }
 .lord-option__mark { color: var(--wood-dark); margin-bottom: 0.3rem; }
-.lord-option__mark .infamy-pips { font-size: 1.25rem; }
+.lord-option__mark .infamy-mark { font-size: 1.25rem; }
 .lord-option__name {
   font-family: var(--font-display); font-weight: 600; font-size: 0.8rem;
   letter-spacing: 0.04em; color: var(--wood-dark); line-height: 1.25;
@@ -676,7 +685,8 @@
    ------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .players { width: 196px; --token: 0.82rem; --seal: 0.86rem; }
+  .players { width: 214px; --token: 0.82rem; --seal: 0.86rem; --mark-max: 30px; }
+  .players:has(.player-card:nth-child(4)) { --mark-max: 26px; }
   .hud__banner { max-width: 52vw; }
   .hold { --hold-card-w: 96px; --hold-card-h: 134px; }
   .log { display: none; }
@@ -684,7 +694,7 @@
 
 @media (max-width: 640px) {
   :root { --hud-gap: 8px; }
-  .players { width: 152px; --token: 0.64rem; --seal: 0.68rem; }
+  .players { width: 164px; --token: 0.64rem; --seal: 0.68rem; --mark-max: 24px; }
   .player-card { --card-pad: 0.5rem; padding: 0.5rem var(--card-pad); }
   .player-card__gems { gap: 2px; }
   .player-card__name { font-size: 0.78rem; }

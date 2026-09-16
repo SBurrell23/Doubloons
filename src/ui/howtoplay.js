@@ -7,7 +7,7 @@
 import { el, button, clear, trapFocus, gemChip } from './dom.js';
 import { play } from '../audio/sfx.js';
 import { GEM_INFO, GEMS } from '../game/data.js';
-import { icon, SKULL_PATH } from './icons.js';
+import { icon, SKULL_SILHOUETTE, SKULL_FEATURES } from './icons.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -81,16 +81,23 @@ function miniCard(x, y, w, h, { bonus = 'sapphire', points = 2, cost = { pearl: 
   const bandY = y + h * 0.145;
   const sealR = w * 0.165;
 
-  // One skull per point, the way a real card prints it -- shrunk to
-  // stay clear of the bonus, since this card is a thumbnail.
+  // The skull and how many, the way a real card prints it.
   if (points > 0) {
-    const pip = Math.min(sealR * 1.5, (w * 0.52) / points * 0.93);
-    for (let i = 0; i < points; i++) {
-      group.append(svg('path', {
-        d: SKULL_PATH, fill: '#100a05', 'fill-rule': 'evenodd',
-        transform: `translate(${x + w * 0.06 + i * pip * 1.08} ${bandY - pip / 2}) scale(${pip / 24})`,
-      }));
-    }
+    const mark = sealR * 2.1;
+    const mx = x + w * 0.05;
+    const fit = `translate(${mx} ${bandY - mark / 2}) scale(${mark / 24})`;
+    group.append(
+      svg('path', { d: SKULL_SILHOUETTE, class: 'skull-mark__body', transform: fit }),
+      svg('path', { d: SKULL_FEATURES, class: 'skull-mark__face', 'fill-rule': 'evenodd', transform: fit }),
+      svg('text', {
+        x: mx + mark * 1.05, y: bandY,
+        'text-anchor': 'start', 'dominant-baseline': 'central',
+        'font-size': mark * 0.58, 'font-weight': '700',
+        'font-family': 'Cinzel, Georgia, serif',
+        fill: '#f7ecd2', stroke: '#100a05', 'stroke-width': mark * 0.09,
+        'stroke-linejoin': 'round', 'paint-order': 'stroke',
+      }, `×${points}`),
+    );
   }
 
   group.append(

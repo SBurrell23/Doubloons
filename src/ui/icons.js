@@ -7,16 +7,30 @@
 
 const NS = 'http://www.w3.org/2000/svg';
 
+/*
+ * The skull comes in two layers. As an icon it is one path with the
+ * sockets cut out by the even-odd rule; as Infamy's mark it is a bone
+ * silhouette with a dark outline and the features painted back on top,
+ * which is the only way a skull reads on a red card, a blue card and
+ * somebody's portrait all at once.
+ */
+export const SKULL_SILHOUETTE =
+  'M12 2.2c-4.3 0-7.8 3.3-7.8 7.5 0 2.4 1.1 4.5 2.8 5.8v2.7c0 1.3 1 2.3 2.3 2.3h5.4c1.3 0 2.3-1 2.3-2.3v-2.7c1.7-1.3 2.8-3.4 2.8-5.8 0-4.2-3.5-7.5-7.8-7.5z';
+export const SKULL_FEATURES =
+  'M9.1 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
+  'M14.9 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
+  'M12 13.6l1.5 2.6h-3z' +
+  'M9.2 17.3h1.3v2.1H9.2z' +
+  'M11.35 17.3h1.3v2.1h-1.3z' +
+  'M13.5 17.3h1.3v2.1h-1.3z';
+
+/** Bone, and the dark it is drawn against. */
+export const MARK_BONE = '#f7ecd2';
+export const MARK_INK = '#100a05';
+
 /** Solid shapes, with holes cut by the even-odd rule. */
 const FILLED = {
-  skull:
-    'M12 2.2c-4.3 0-7.8 3.3-7.8 7.5 0 2.4 1.1 4.5 2.8 5.8v2.7c0 1.3 1 2.3 2.3 2.3h5.4c1.3 0 2.3-1 2.3-2.3v-2.7c1.7-1.3 2.8-3.4 2.8-5.8 0-4.2-3.5-7.5-7.8-7.5z' +
-    'M9.1 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
-    'M14.9 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
-    'M12 13.6l1.5 2.6h-3z' +
-    'M9.2 17.3h1.3v2.1H9.2z' +
-    'M11.35 17.3h1.3v2.1h-1.3z' +
-    'M13.5 17.3h1.3v2.1h-1.3z',
+  skull: SKULL_SILHOUETTE + SKULL_FEATURES,
 
   crown:
     'M3 8.4l3.4 2.9L12 4.6l5.6 6.7L21 8.4l-1.7 9.2H4.7L3 8.4z' +
@@ -183,6 +197,50 @@ export const ICON_NAMES = [...Object.keys(FILLED), ...Object.keys(STROKED)];
  * those four draw their own SVG rather than calling icon().
  */
 export const SKULL_PATH = FILLED.skull;
+
+/**
+ * Infamy's mark: a bone skull with a dark outline, on the 24x24 grid.
+ * Built rather than drawn by icon() because it is two painted layers,
+ * not one path inheriting a colour.
+ */
+export function skullMark({ size = '1em', className = '' } = {}) {
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size);
+  svg.setAttribute('class', `icon skull-mark ${className}`.trim());
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const body = document.createElementNS(NS, 'path');
+  body.setAttribute('d', SKULL_SILHOUETTE);
+  body.setAttribute('class', 'skull-mark__body');
+
+  const face = document.createElementNS(NS, 'path');
+  face.setAttribute('d', SKULL_FEATURES);
+  face.setAttribute('class', 'skull-mark__face');
+  face.setAttribute('fill-rule', 'evenodd');
+
+  svg.append(body, face);
+  return svg;
+}
+
+/** The same mark, painted into a 2D canvas and centred on (cx, cy). */
+export function drawSkullMark(ctx, cx, cy, size) {
+  ctx.save();
+  ctx.translate(cx - size / 2, cy - size / 2);
+  ctx.scale(size / 24, size / 24);
+  const body = new Path2D(SKULL_SILHOUETTE);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1.7;
+  ctx.strokeStyle = MARK_INK;
+  ctx.stroke(body);
+  ctx.fillStyle = MARK_BONE;
+  ctx.fill(body);
+  ctx.fillStyle = MARK_INK;
+  ctx.fill(new Path2D(SKULL_FEATURES), 'evenodd');
+  ctx.restore();
+}
 
 /**
  * Build an icon element.

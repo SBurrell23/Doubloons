@@ -1,7 +1,7 @@
 // Minimal DOM helpers. No framework; the UI is small enough.
 
 import { play } from '../audio/sfx.js';
-import { icon } from './icons.js';
+import { icon, skullMark } from './icons.js';
 
 /**
  * el('div.foo#bar', { attrs }, ...children)
@@ -199,33 +199,32 @@ export function bonusDisc(gem, count = null, { size = '', tip = null, empty = fa
 }
 
 /**
- * Infamy, counted: one skull per point, the way the cards and the Lord
- * tiles print it. Good up to about five, which is as much as anything
- * is worth on its own.
+ * Infamy: the skull, and how many. `×3` on anything that is worth
+ * three — a card, a Lord — and a plain total on anything that has
+ * three, like a player's running score.
+ *
+ * drawInfamyMark() paints the same mark on the cards and Lord tiles.
  */
-export function infamyPips(points, { size = '', tip = null } = {}) {
-  const classes = ['infamy-pips'];
-  if (size) classes.push(`infamy-pips--${size}`);
-  const row = el(`span.${classes.join('.')}`, {
+function infamyMark(points, { times, size, tip }) {
+  const classes = ['infamy-mark'];
+  if (times) classes.push('infamy-mark--times');
+  if (size) classes.push(`infamy-mark--${size}`);
+  return el(`span.${classes.join('.')}`, {
     tip, role: 'img', 'aria-label': `${points} Infamy`,
-  });
-  for (let i = 0; i < points; i++) {
-    row.append(icon('skull', { size: '1em', className: 'infamy-pips__pip' }));
-  }
-  return row;
+  },
+    skullMark({ size: '1em', className: 'infamy-mark__skull' }),
+    el('span.infamy-mark__n', {}, times ? `\u00d7${points}` : String(points)),
+  );
 }
 
-/**
- * Infamy, totalled: one skull and a number. A running score climbs past
- * fifteen, and nobody counts fifteen skulls.
- */
+/** What a thing is worth: skull ×3. */
+export function infamyTimes(points, { size = '', tip = null } = {}) {
+  return infamyMark(points, { times: true, size, tip });
+}
+
+/** What somebody has: skull 17. */
 export function infamyCount(points, { size = '', tip = null } = {}) {
-  const classes = ['infamy-count'];
-  if (size) classes.push(`infamy-count--${size}`);
-  return el(`span.${classes.join('.')}`, { tip },
-    icon('skull', { size: '1.15em', className: 'infamy-count__skull' }),
-    el('span.infamy-count__n', {}, String(points)),
-  );
+  return infamyMark(points, { times: false, size, tip });
 }
 
 /** Format a cost object as a row of gem chips. */
