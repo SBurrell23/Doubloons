@@ -395,6 +395,15 @@ function wireSession() {
     hud?.toast(text, kind);
   });
 
+  session.on('paused', (waiting) => showHeld(waiting));
+
+  session.on('status', (status) => {
+    // 'reconnecting' is only the signalling socket blinking, which the
+    // game does not care about; 'rejoining' means our channel is gone.
+    if (status === 'rejoining') showHeld(['you'], { self: true });
+    else if (status === 'connected') showHeld([]);
+  });
+
   session.on('lost', (reason) => {
     play('deny');
     showDisconnected(reason);
@@ -403,6 +412,46 @@ function wireSession() {
   session.on('error', (error) => {
     console.error('[net]', error);
   });
+}
+
+/*
+ * The table is held while somebody is adrift. Nothing is played for
+ * them -- they keep their seat until they reconnect, or until the host
+ * decides the voyage cannot wait any longer.
+ */
+let heldOverlay = null;
+function showHeld(waiting, { self = false } = {}) {
+  if (!waiting || !waiting.length) {
+    heldOverlay?.remove();
+    heldOverlay = null;
+    return;
+  }
+  if (screen !== 'table') return;
+  heldOverlay?.remove();
+
+  const names = self ? null : waiting.join(' and ');
+  const canCover = !self && session?.isHost && typeof session.coverForAdrift === 'function';
+
+  heldOverlay = el('div.overlay', {},
+    el('div.panel.modal', { style: { '--modal-w': '460px' } },
+      el('h2.panel__title', {}, self ? 'Finding the table' : 'The voyage is held'),
+      el('p.panel__sub', {}, self
+        ? 'Your line to the host parted. Trying to pick it back up — your seat and cards are waiting.'
+        : `Waiting for ${names} to come back aboard. Nobody is playing their hand.`),
+      session?.code && !self
+        ? el('p.panel__sub', {}, 'They can rejoin with the same code: ', el('b', {}, session.code))
+        : null,
+      canCover
+        ? el('div.modal__foot', {},
+          button('Sail without them', {
+            class: 'btn--ghost',
+            onClick: () => { session.coverForAdrift(); showHeld([]); },
+          }),
+        )
+        : null,
+    ),
+  );
+  document.body.append(heldOverlay);
 }
 
 function showDisconnected(reason) {

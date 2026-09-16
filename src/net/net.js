@@ -70,6 +70,8 @@ export class Host extends Emitter {
     this.code = null;
     this.connections = new Map();  // peerId -> DataConnection
     this.destroyed = false;
+    this._retryTimer = 0;
+    this._retries = 0;
   }
 
   /** Claim a room code. Retries on collision. */
@@ -141,16 +143,41 @@ export class Host extends Emitter {
       });
     });
 
+    // Fires again after a successful reconnect, not just the first open.
+    peer.on('open', () => {
+      this._retries = 0;
+      if (!this.destroyed) this.emit('status', 'online');
+    });
+
     peer.on('disconnected', () => {
       if (this.destroyed) return;
       this.emit('status', 'reconnecting');
       // The broker dropped us; the data channels usually survive.
-      try { peer.reconnect(); } catch { /* handled by the error event */ }
+      this._scheduleReconnect(peer);
     });
 
     peer.on('close', () => {
       if (!this.destroyed) this.emit('status', 'closed');
     });
+  }
+
+  /*
+   * Backoff matters here. A failed reconnect ends in PeerJS's _abort(),
+   * which calls disconnect() again -- straight back into this handler.
+   * Reconnecting inline spun the broker in a tight loop and never
+   * recovered: the old room id stays registered for a while after the
+   * socket drops, so every immediate retry hit 'unavailable-id'.
+   */
+  _scheduleReconnect(peer) {
+    if (this.destroyed || this._retryTimer) return;
+    if (this._retries >= 8) { this.emit('status', 'offline'); return; }
+    const wait = Math.min(30000, 1000 * 2 ** this._retries);
+    this._retries += 1;
+    this._retryTimer = setTimeout(() => {
+      this._retryTimer = 0;
+      if (this.destroyed || peer.destroyed || !peer.disconnected) return;
+      try { peer.reconnect(); } catch { /* the error event covers it */ }
+    }, wait);
   }
 
   send(peerId, message) {
@@ -179,6 +206,8 @@ export class Host extends Emitter {
 
   destroy() {
     this.destroyed = true;
+    clearTimeout(this._retryTimer);
+    this._retryTimer = 0;
     for (const conn of this.connections.values()) {
       try { conn.close(); } catch { /* already gone */ }
     }
@@ -200,6 +229,7 @@ export class Client extends Emitter {
     this.conn = null;
     this.code = null;
     this.destroyed = false;
+    this._retryTimer = 0;
   }
 
   connect(code) {
@@ -247,7 +277,13 @@ export class Client extends Emitter {
           if (!this.destroyed) this.emit('disconnect');
         });
 
-        conn.on('error', (error) => fail(error));
+        conn.on('error', (error) => {
+          // Before the handshake lands this is a failed join; after it,
+          // the channel is gone and somebody has to say so -- fail() is
+          // a no-op once settled, so this used to go nowhere.
+          if (settled) { if (!this.destroyed) this.emit('disconnect'); return; }
+          fail(error);
+        });
       });
 
       peer.on('error', (error) => {
@@ -261,7 +297,13 @@ export class Client extends Emitter {
       peer.on('disconnected', () => {
         if (this.destroyed) return;
         this.emit('status', 'reconnecting');
-        try { peer.reconnect(); } catch { /* handled by the error event */ }
+        // Same tight-loop hazard as the host; see Host._scheduleReconnect.
+        if (this._retryTimer) return;
+        this._retryTimer = setTimeout(() => {
+          this._retryTimer = 0;
+          if (this.destroyed || peer.destroyed || !peer.disconnected) return;
+          try { peer.reconnect(); } catch { /* handled by the error event */ }
+        }, 1500);
       });
     });
   }
@@ -274,6 +316,8 @@ export class Client extends Emitter {
 
   destroy() {
     this.destroyed = true;
+    clearTimeout(this._retryTimer);
+    this._retryTimer = 0;
     try { this.conn?.close(); } catch { /* already gone */ }
     try { this.peer?.destroy(); } catch { /* already gone */ }
     this.conn = null;
@@ -288,13 +332,15 @@ export class Client extends Emitter {
 
 export const MSG = {
   // client -> host
-  HELLO: 'hello',
+  HELLO: 'hello',      // { name, token? } -- token reclaims a held seat
   RENAME: 'rename',
   ACTION: 'action',
   CHAT: 'chat',
   LEAVE: 'leave',
   // host -> client
   WELCOME: 'welcome',
+  SEATED: 'seated',    // { seatId, token } -- your identity across reconnects
+  PAUSE: 'pause',      // { waiting: [names] } -- empty list means resumed
   LOBBY: 'lobby',
   STATE: 'state',
   EFFECTS: 'effects',
