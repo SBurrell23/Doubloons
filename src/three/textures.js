@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
 import { GEM_INFO, TIER_INFO, LORD_POINTS } from '../game/data.js';
-import { drawSkullMark, MARK_BONE, MARK_INK } from '../ui/icons.js';
+import { drawSkullMark, MARK_BONE, MARK_INK, SKULL_MARK_FOOT } from '../ui/icons.js';
 import { drawCardArt, ART_PALETTE } from './cardart/index.js';
 import { LORD_ART } from './cardart/lords.js';
 
@@ -398,17 +398,21 @@ export function drawBonusDisc(ctx, cx, cy, r, gem, amount = null) {
 export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
   drawSkullMark(ctx, left + size / 2, cy, size);
 
+  // One skull is one Infamy; it does not need telling twice.
+  if (count <= 1) return size;
+
   ctx.save();
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'alphabetic';
   ctx.lineJoin = 'round';
   ctx.lineWidth = Math.max(3, size * 0.1);
   ctx.strokeStyle = MARK_INK;
   ctx.fillStyle = MARK_BONE;
 
-  // The times sign and the number are drawn separately: set as one
-  // string the x sits right up against the digit.
-  const baseline = cy + size * 0.02;
+  // The count stands on the jaw rather than floating beside the eyes,
+  // and the times sign is drawn separately: set as one string the x
+  // sits right up against the digit.
+  const baseline = cy - size / 2 + size * SKULL_MARK_FOOT;
   let x = left + size * 0.86;
   const stamp = (text, fontSize) => {
     ctx.font = `700 ${Math.round(fontSize)}px Cinzel, Georgia, serif`;
@@ -418,7 +422,7 @@ export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
   };
   stamp('\u00d7', size * 0.44);
   x += size * 0.06;
-  stamp(String(count), size * 0.56);
+  stamp(String(count), size * 0.62);
 
   ctx.restore();
   return x - left;
@@ -543,7 +547,7 @@ export const ART_PANEL = { x: 32, y: 194, w: 356, h: 198 };
 
 /** Where a Pirate Lord's portrait lives on their tile. */
 export const LORD_W = 420;
-export const LORD_H = 500;
+export const LORD_H = 540;
 export const LORD_ART_PANEL = { x: 44, y: 116, w: 332, h: 206 };
 
 export function cardFaceCanvas(card) {
@@ -589,12 +593,15 @@ export function cardFaceCanvas(card) {
   drawBonusDisc(ctx, CARD_W - 86, 12 + band / 2, 50, card.bonus);
 
   // --- name ---
+  // Sized to the space rather than guessed from the character count: a
+  // long name used to wrap, and a wrapped name's first line climbed up
+  // into the header band.
   ctx.fillStyle = '#241a10';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontSize = card.name.length > 19 ? 28 : 33;
-  ctx.font = `600 ${fontSize}px Cinzel, Georgia, serif`;
-  wrapText(ctx, card.name, CARD_W / 2, 166, CARD_W - 60, fontSize + 6);
+  const fontSize = fitFont(ctx, card.name, CARD_W - 60, [33, 30, 27, 24, 21], (px) =>
+    `600 ${px}px Cinzel, Georgia, serif`);
+  wrapText(ctx, card.name, CARD_W / 2, 166, CARD_W - 60, fontSize + 5);
 
   // --- illustration ---
   const { x: ax, y: ay, w: aw, h: ah } = ART_PANEL;
@@ -770,15 +777,22 @@ export function lordCanvas(lord) {
   ctx.lineTo(px + pw, py + ph);
   ctx.stroke();
 
-  // What it is worth, in its own band above the portrait. It used to be
-  // stamped across the picture, which is fine for a warrant and less
-  // fine for the one drawing on the tile.
-  drawInfamyMark(ctx, 40, 70, LORD_POINTS, { size: 84 });
+  // What it is worth, in its own band above the portrait: three skulls,
+  // centred, because a Lord is always worth three and a row of them is
+  // read without reading anything. It used to be stamped across the
+  // picture, which is fine for a warrant and less fine for the one
+  // drawing on the tile.
+  {
+    const pip = 62;
+    const step = pip * 1.04;
+    const startX = size / 2 - ((LORD_POINTS - 1) * step) / 2;
+    for (let i = 0; i < LORD_POINTS; i++) drawSkullMark(ctx, startX + i * step, 68, pip);
+  }
   ctx.strokeStyle = 'rgba(107,74,16,0.35)';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(px, 112);
-  ctx.lineTo(px + pw, 112);
+  ctx.moveTo(px, 108);
+  ctx.lineTo(px + pw, 108);
   ctx.stroke();
 
   // Name. Alignment is set here rather than inherited from whatever
@@ -786,19 +800,21 @@ export function lordCanvas(lord) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#3a2410';
-  ctx.font = '600 27px Cinzel, Georgia, serif';
-  wrapText(ctx, lord.name, size / 2, 356, size - 70, 32);
+  const nameSize = fitFont(ctx, lord.name, size - 80, [27, 24, 21], (px) =>
+    `600 ${px}px Cinzel, Georgia, serif`);
+  wrapText(ctx, lord.name, size / 2, 356, size - 80, nameSize + 5);
   ctx.fillStyle = '#6b4a10';
   ctx.font = 'italic 21px Spectral, Georgia, serif';
   ctx.fillText(lord.title, size / 2, 390);
 
-  // Requirements -- bonuses, so they wear the bonus seal. They sit
-  // clear of the border now rather than pressed against it.
+  // Requirements -- bonuses, so they wear the bonus seal. Clear of the
+  // title above them and clear of the border below, which the tile was
+  // made taller to afford.
   const reqs = Object.entries(lord.req);
   const gap = 104;
   const startX = size / 2 - ((reqs.length - 1) * gap) / 2;
   reqs.forEach(([gem, n], i) => {
-    drawBonusDisc(ctx, startX + i * gap, 442, 46, gem, n);
+    drawBonusDisc(ctx, startX + i * gap, 460, 44, gem, n);
   });
 
   return el;
@@ -841,6 +857,18 @@ function drawCaptainSilhouette(ctx, cx, cy, r) {
   ctx.arc(0, -r * 0.62, r * 0.13, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+/**
+ * The largest of `sizes` that fits `text` on one line. Falls back to
+ * the smallest, which wrapText then breaks if it still has to.
+ */
+function fitFont(ctx, text, maxWidth, sizes, font) {
+  for (const px of sizes) {
+    ctx.font = font(px);
+    if (ctx.measureText(text).width <= maxWidth) return px;
+  }
+  return sizes[sizes.length - 1];
 }
 
 function wrapText(ctx, text, x, y, maxWidth, lineHeight) {

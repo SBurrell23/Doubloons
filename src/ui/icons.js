@@ -14,18 +14,30 @@ const NS = 'http://www.w3.org/2000/svg';
  * which is the only way a skull reads on a red card, a blue card and
  * somebody's portrait all at once.
  */
+/*
+ * A high cranium that tapers to the cheekbones and hands down to a
+ * narrower jaw, and sockets cut as slanted wedges rather than drilled
+ * as circles -- they fall toward the nose, which is the whole of the
+ * difference between a skull that scowls and a skull that gawps.
+ */
 export const SKULL_SILHOUETTE =
-  'M12 2.2c-3.65 0-6.6 3.3-6.6 7.5 0 2.4 1 4.5 2.6 5.8v2.7c0 1.3 1 2.3 2.3 2.3h3.4c1.3 0 2.3-1 2.3-2.3v-2.7c1.6-1.3 2.6-3.4 2.6-5.8 0-4.2-2.95-7.5-6.6-7.5z';
+  'M12 1.3C7.7 1.3 4.6 5 4.6 9.7c0 2.6.8 4.6 2.2 6l1 1v2.9c0 1.7 1.3 3.1 3 3.1h2.4c1.7 0 3-1.4 3-3.1v-2.9l1-1c1.4-1.4 2.2-3.4 2.2-6C19.4 5 16.3 1.3 12 1.3z';
 export const SKULL_FEATURES =
-  'M9.7 8.05a2.35 2.35 0 1 0 0 4.7 2.35 2.35 0 0 0 0-4.7z' +
-  'M14.3 8.05a2.35 2.35 0 1 0 0 4.7 2.35 2.35 0 0 0 0-4.7z' +
-  'M12 13.7l1.3 2.4h-2.6z' +
-  'M9.6 17.3h1.3v2.1H9.6z' +
-  'M11.35 17.3h1.3v2.1h-1.3z' +
-  'M13.1 17.3h1.3v2.1h-1.3z';
+  'M6 7.9l5.2 2-.8 3.4-4.6-1z' +
+  'M18 7.9l-5.2 2 .8 3.4 4.6-1z' +
+  'M12 13.4l1.7 3.1h-3.4z' +
+  'M9.9 17.5h1v3.2h-1z' +
+  'M11.5 17.5h1v3.2h-1z' +
+  'M13.1 17.5h1v3.2h-1z';
 
 /** How heavy the outline is, on the 24-unit grid. */
-export const SKULL_MARK_STROKE = 2.4;
+export const SKULL_MARK_STROKE = 3.2;
+
+/**
+ * Where the jaw ends, as a share of the 24-unit box. What sits beside
+ * the skull lines its feet up with this rather than with the middle.
+ */
+export const SKULL_MARK_FOOT = 22.7 / 24;
 
 /** Bone, and the dark it is drawn against. */
 export const MARK_BONE = '#f7ecd2';

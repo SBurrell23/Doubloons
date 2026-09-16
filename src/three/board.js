@@ -14,8 +14,8 @@ export const CARD_H = 2.04;
 const CARD_T = 0.032;
 // The Lord tiles are taller than they are wide, like the texture on
 // them; they used to be square and the artwork had nowhere to go.
-const LORD_W = 1.08;
-const LORD_D = 1.29;
+const LORD_W = 1.06;
+const LORD_D = 1.36;
 
 const COL_X = [-3.36, -1.68, 0, 1.68, 3.36];
 const ROW_Z = { 3: -2.35, 2: -0.05, 1: 2.25 };

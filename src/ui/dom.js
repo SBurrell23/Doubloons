@@ -214,9 +214,10 @@ function infamyMark(points, { times, size, tip }) {
   },
     skullMark({ size: '1em', className: 'infamy-mark__skull' }),
     // The times sign carries its own trailing space; kerned against the
-    // digit it reads as one glyph.
-    times ? el('span.infamy-mark__times', {}, '\u00d7') : null,
-    el('span.infamy-mark__n', {}, String(points)),
+    // digit it reads as one glyph. One skull is one Infamy, and saying
+    // so twice is worse than not saying it at all.
+    times && points > 1 ? el('span.infamy-mark__times', {}, '\u00d7') : null,
+    times && points <= 1 ? null : el('span.infamy-mark__n', {}, String(points)),
   );
 }
 
