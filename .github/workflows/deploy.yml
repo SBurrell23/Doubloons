@@ -3,6 +3,10 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Pull requests run the checks and the build, but publish nothing. A
+  # test suite that only runs after merging is not much of a test suite.
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 # Allow the workflow to publish to Pages.
@@ -12,10 +16,12 @@ permissions:
   id-token: write
 
 # One deployment at a time; queued runs supersede each other rather than
-# cancelling a publish that is already underway.
+# cancelling a publish that is already underway. Pull requests get a
+# group of their own so they never queue behind a publish, and a new push
+# to a branch supersedes the run still checking the old one.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'pull_request' && format('pr-{0}', github.ref) || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -49,13 +55,16 @@ jobs:
           GITHUB_PAGES: 'true'
 
       - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
         with:
           path: dist
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
