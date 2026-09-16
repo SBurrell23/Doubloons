@@ -580,10 +580,16 @@ body.gem-white .gem--onyx {
 .skull-mark__face { fill: #100a05; }
 
 .infamy-mark {
+  /* Cinzel's digits stand 0.72 of their size and have no descender, so
+     a glyph box that tall, sat on the same baseline, puts the middle of
+     the skull on the middle of the number. Both are driven from --digit
+     so they cannot drift apart. */
+  --digit: 1.45em;
   display: inline-flex;
-  /* Feet on the jaw, not level with the eyes. */
-  align-items: flex-end;
-  gap: 0.05em;
+  align-items: baseline;
+  /* The skull is a mark, not a numeral; it wants air before the count
+     rather than being set tight against it. */
+  gap: 0.2em;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.92rem;
@@ -599,15 +605,16 @@ body.gem-white .gem--onyx {
     1px 1px 0 #100a05, -1px -1px 0 #100a05,
     1px -1px 0 #100a05, -1px 1px 0 #100a05;
 }
-/* The skull reads as tall as the digit beside it, not taller. */
-.infamy-mark__skull { flex: none; width: 1.6em; height: 1.6em; }
-/* The glyph box has a little air under the jaw; the type standing
-   beside it takes the same amount so their feet land together. */
-.infamy-mark__times,
-.infamy-mark__n { margin-bottom: 0.09em; }
-.infamy-mark__times { font-size: 1.05em; padding-right: 0.12em; }
-.infamy-mark__n { font-size: 1.45em; letter-spacing: -0.01em; }
-.infamy-mark--times .infamy-mark__n { font-size: 1.25em; }
+/* The bone sits centred in its glyph box, so a box one cap-height tall
+   reads a shade shorter than the digit and centred on it. */
+.infamy-mark__skull {
+  flex: none;
+  width: calc(var(--digit) * 0.72);
+  height: calc(var(--digit) * 0.72);
+}
+.infamy-mark__times { font-size: 1.05em; padding-right: 0.06em; }
+.infamy-mark__n { font-size: var(--digit); letter-spacing: -0.01em; }
+.infamy-mark--times { --digit: 1.25em; }
 
 .bonus-disc--sm, .infamy-mark--sm { font-size: 0.74rem; }
 .bonus-disc--lg, .infamy-mark--lg { font-size: 1.15rem; }

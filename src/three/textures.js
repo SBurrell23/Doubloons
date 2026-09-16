@@ -412,7 +412,9 @@ export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
   // The count stands on the jaw rather than floating beside the eyes,
   // and the times sign is drawn separately: set as one string the x
   // sits right up against the digit.
-  const baseline = cy - size / 2 + size * SKULL_MARK_FOOT;
+  // Standing on the jaw, less a hair: sitting exactly on the bone's
+  // foot the count read as though it had slipped off the bottom.
+  const baseline = cy - size / 2 + size * (SKULL_MARK_FOOT - 0.035);
   let x = left + size * 0.86;
   const stamp = (text, fontSize) => {
     ctx.font = `700 ${Math.round(fontSize)}px Cinzel, Georgia, serif`;
@@ -584,8 +586,9 @@ export function cardFaceCanvas(card) {
   ctx.stroke();
 
   // --- infamy, top-left, the same size as the bonus opposite it ---
+  // Set close to the band's left edge; the count travels with it.
   if (card.points > 0) {
-    drawInfamyMark(ctx, 30, 12 + band / 2, card.points, { size: 100 });
+    drawInfamyMark(ctx, 24, 12 + band / 2, card.points, { size: 100 });
   }
 
   // --- bonus gem, top-right, sunk in the same seal so it separates
