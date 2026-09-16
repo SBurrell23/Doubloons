@@ -7,7 +7,7 @@
 import { el, button, clear, trapFocus, gemChip } from './dom.js';
 import { play } from '../audio/sfx.js';
 import { GEM_INFO, GEMS } from '../game/data.js';
-import { icon } from './icons.js';
+import { icon, SKULL_PATH } from './icons.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -75,29 +75,31 @@ function miniCard(x, y, w, h, { bonus = 'sapphire', points = 2, cost = { pearl: 
     }),
   );
 
-  // Infamy and the bonus wear the same two seals a real card does --
-  // this is the picture people learn the card from, so it had better
-  // be a picture of the card.
+  // Infamy and the bonus wear the two marks a real card does -- this is
+  // the picture people learn the card from, so it had better be a
+  // picture of the card.
   const bandY = y + h * 0.145;
   const sealR = w * 0.165;
-  const seal = (cx) => svg('circle', {
-    cx, cy: bandY, r: sealR,
-    fill: 'rgba(18,11,5,0.78)', stroke: '#dcb968', 'stroke-width': Math.max(1.2, sealR * 0.12),
-  });
 
+  // One skull per point, the way a real card prints it -- shrunk to
+  // stay clear of the bonus, since this card is a thumbnail.
   if (points > 0) {
-    group.append(
-      seal(x + w * 0.2),
-      svg('text', {
-        x: x + w * 0.2, y: bandY,
-        'text-anchor': 'middle', 'dominant-baseline': 'central',
-        'font-size': sealR * 1.32, 'font-weight': '700',
-        'font-family': 'Cinzel, Georgia, serif',
-        fill: '#ffeec2',
-      }, String(points)),
-    );
+    const pip = Math.min(sealR * 1.5, (w * 0.52) / points * 0.93);
+    for (let i = 0; i < points; i++) {
+      group.append(svg('path', {
+        d: SKULL_PATH, fill: '#100a05', 'fill-rule': 'evenodd',
+        transform: `translate(${x + w * 0.06 + i * pip * 1.08} ${bandY - pip / 2}) scale(${pip / 24})`,
+      }));
+    }
   }
-  group.append(seal(x + w * 0.8), gemShape(x + w * 0.8, bandY, sealR * 0.72, bonus));
+
+  group.append(
+    svg('circle', {
+      cx: x + w * 0.8, cy: bandY, r: sealR,
+      fill: 'rgba(18,11,5,0.78)', stroke: '#dcb968', 'stroke-width': Math.max(1.2, sealR * 0.12),
+    }),
+    gemShape(x + w * 0.8, bandY, sealR * 0.72, bonus),
+  );
 
   if (name) {
     group.append(svg('text', {
@@ -294,8 +296,8 @@ function pGoal() {
   return el('div.guide__page', {},
     el('h3.guide__heading', {}, 'What you are trying to do'),
     el('p', {}, 'You are a pirate captain building a fleet and a reputation. Gems buy cards. Cards give you ',
-      el('b', {}, 'infamy'), ' — and a permanent ', el('b', {}, 'bonus'), ' that makes every later card cheaper.'),
-    el('p', {}, 'First captain to ', el('b', {}, '15 infamy'), ' triggers the final round. Highest total wins.'),
+      el('b', {}, 'Infamy'), ' — and a permanent ', el('b', {}, 'bonus'), ' that makes every later card cheaper.'),
+    el('p', {}, 'First captain to ', el('b', {}, '15 Infamy'), ' triggers the final round. Highest total wins.'),
     figure(anatomyDiagram(), 'Every card does three things at once.'),
     el('div.guide__callout', {},
       el('b', {}, 'The whole game in one line: '),
@@ -333,7 +335,7 @@ function pBonus() {
 function pLords() {
   return el('div.guide__page', {},
     el('h3.guide__heading', {}, 'Pirate Lords'),
-    el('p', {}, 'Each Lord is worth ', el('b', {}, '3 infamy'), ' — the same as a very expensive card, for free.'),
+    el('p', {}, 'Each Lord is worth ', el('b', {}, '3 Infamy'), ' — the same as a very expensive card, for free.'),
     figure(lordDiagram(), 'Meet a Lord’s demand and they join at the end of your turn.'),
     el('ul.guide__list', {},
       el('li', {}, 'They count ', el('b', {}, 'bonuses only'), '. Gems in your hand are irrelevant.'),
@@ -350,12 +352,12 @@ function pEnd() {
     figure(endDiagram(), 'Reaching the target starts the last lap — it does not stop play.'),
     el('ul.guide__list', {},
       el('li', {}, 'When someone reaches the target, the round is finished so everybody has had the same number of turns.'),
-      el('li', {}, 'Highest infamy wins.'),
+      el('li', {}, 'Highest Infamy wins.'),
       el('li', {}, 'A tie goes to whoever bought ', el('b', {}, 'fewer'), ' cards — efficiency beats volume.'),
     ),
     el('div.guide__callout', {},
       el('b', {}, 'A word of advice: '),
-      'do not chase the biggest cards early. Three cheap bonuses now will buy you a five-infamy legend later.'),
+      'do not chase the biggest cards early. Three cheap bonuses now will buy you a five-Infamy legend later.'),
   );
 }
 
@@ -380,7 +382,7 @@ function pReference() {
     ['Tokens you may hold', '10 at the end of your turn'],
     ['Cards in your hold', '3'],
     ['Take two of a colour', 'Only when 4 or more remain'],
-    ['Target', '15 infamy by default'],
+    ['Target', '15 Infamy by default'],
   ];
   const table = el('div.guide__table');
   for (const [k, v] of rows) {

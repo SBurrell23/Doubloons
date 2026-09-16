@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
 import { GEM_INFO, TIER_INFO, LORD_POINTS } from '../game/data.js';
+import { SKULL_PATH } from '../ui/icons.js';
 import { drawCardArt, ART_PALETTE } from './cardart/index.js';
 import { LORD_ART } from './cardart/lords.js';
 
@@ -383,16 +384,35 @@ export function drawBonusDisc(ctx, cx, cy, r, gem, amount = null) {
   else drawGemWithCount(ctx, cx, cy + r * 0.04, gemR, gem, amount);
 }
 
-/** Infamy: the same seal with the number struck on it. */
-export function drawInfamySeal(ctx, cx, cy, r, points) {
-  seal(ctx, cx, cy, r, Math.max(3, r * 0.085));
-  ctx.save();
-  ctx.fillStyle = '#ffeec2';
-  ctx.font = `700 ${Math.round(r * 1.32)}px Cinzel, Georgia, serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(String(points), cx, cy + r * 0.06);
-  ctx.restore();
+/**
+ * Infamy: one black skull per point, in a row. A card is worth one to
+ * five, and a row of skulls is counted rather than read -- no digit to
+ * find, no seal to tell apart from the bonus beside it. Every skull is
+ * the same size whatever the total, so the length of the row is the
+ * score.
+ *
+ * The pale halo is what lets a black skull sit on a red, blue or black
+ * header band without disappearing into it.
+ *
+ * `left` is where the row starts; `cy` is its middle.
+ */
+export const INFAMY_PIP = 48;
+
+export function drawInfamyPips(ctx, left, cy, count, { size = INFAMY_PIP, gap = size * 0.06 } = {}) {
+  const step = size + gap;
+  for (let i = 0; i < count; i++) {
+    ctx.save();
+    ctx.translate(left + i * step, cy - size / 2);
+    ctx.scale(size / 24, size / 24);
+    ctx.shadowColor = 'rgba(255,240,210,0.6)';
+    ctx.shadowBlur = 24 * 0.07;
+    ctx.fillStyle = '#100a05';
+    const pip = new Path2D(SKULL_PATH);
+    ctx.fill(pip, 'evenodd');
+    ctx.fill(pip, 'evenodd');   // twice, so the halo builds up enough to read
+    ctx.restore();
+  }
+  return count * step - gap;
 }
 
 /** Gold coin face, for doubloons. */
@@ -526,9 +546,9 @@ export function cardFaceCanvas(card) {
   ctx.lineTo(CARD_W - 12, 12 + band);
   ctx.stroke();
 
-  // --- infamy, top-left, on a dark seal so it reads at any distance ---
+  // --- infamy, top-left: one skull per point ---
   if (card.points > 0) {
-    drawInfamySeal(ctx, 78, 12 + band / 2, 47, card.points);
+    drawInfamyPips(ctx, 30, 12 + band / 2, card.points);
   }
 
   // --- bonus gem, top-right, sunk in the same seal so it separates
@@ -717,13 +737,29 @@ export function lordCanvas(lord) {
   ctx.lineTo(px + pw, py + ph);
   ctx.stroke();
 
-  // The seal sits over the portrait's corner, like a stamp on a warrant
-  // -- the same seal a card wears, because it is the same three infamy.
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 10;
-  drawInfamySeal(ctx, 74, 74, 42, LORD_POINTS);
-  ctx.restore();
+  // Three skulls stamped across the portrait's corner, like a mark on
+  // a warrant -- the same mark a card wears, because it is the same
+  // three Infamy. On a card they sit on a plain colour band; here they
+  // land on whatever the portrait happens to be, so they get a slip of
+  // bone to be stamped on.
+  {
+    const pip = 46;
+    const left = 40;
+    const cy = 68;
+    const width = LORD_POINTS * (pip + pip * 0.06) - pip * 0.06;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = 'rgba(238, 227, 200, 0.92)';
+    roundRect(ctx, left - 12, cy - pip * 0.66, width + 24, pip * 1.32, 10);
+    ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(107,74,16,0.55)';
+    ctx.lineWidth = 2;
+    roundRect(ctx, left - 12, cy - pip * 0.66, width + 24, pip * 1.32, 10);
+    ctx.stroke();
+    drawInfamyPips(ctx, left, cy, LORD_POINTS, { size: pip });
+  }
 
   // Name. Alignment is set here rather than inherited from whatever
   // drew last -- that is how the name ended up running off the edge.

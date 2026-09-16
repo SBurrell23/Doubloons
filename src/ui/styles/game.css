@@ -66,28 +66,62 @@
    HUD layout
    ------------------------------------------------------------ */
 
+/*
+ * Three columns and three rows. The banner spans the full width and
+ * centres itself on the screen; the panels take the left column from
+ * the very top down, the tools and the log take the right. Everything
+ * is a separate cell, so nothing pushes anything else around.
+ */
 .hud {
   position: absolute;
   inset: 0;
   display: grid;
+  grid-template-columns: auto 1fr auto;
   grid-template-rows: auto 1fr auto;
   padding: var(--hud-gap);
   gap: var(--hud-gap);
   pointer-events: none;
 }
-.hud > * { pointer-events: auto; }
+.hud > * { pointer-events: none; }
+.hud > * > * { pointer-events: auto; }
 
-.hud__top { display: flex; align-items: flex-start; gap: var(--hud-gap); }
-.hud__middle {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: var(--hud-gap);
+.hud__side {
+  grid-column: 1;
+  grid-row: 1 / 3;
   min-height: 0;
-  pointer-events: none;
+  display: flex;
 }
-.hud__middle > * { pointer-events: auto; }
-.hud__bottom { display: flex; align-items: flex-end; gap: var(--hud-gap); }
+.hud__banner {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  justify-self: center;
+  align-self: start;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 44vw;
+}
+.hud__tools {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+}
+.hud__log {
+  grid-column: 3;
+  grid-row: 2;
+  justify-self: end;
+  align-self: stretch;
+  min-height: 0;
+  display: flex;
+}
+.hud__bottom {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--hud-gap);
+}
 
 /* ------------------------------------------------------------
    Turn banner
@@ -130,24 +164,35 @@
 .turn-banner--mine .turn-banner__who { color: var(--brass-bright); }
 .turn-banner__phase { font-size: 0.78rem; opacity: 0.72; font-style: italic; }
 
-/* Turn timer */
+/*
+ * Turn timer. The whole face is the clock, not a ring around an empty
+ * middle, and the spent part sweeps clockwise from noon the way a
+ * clock does -- it used to eat its way round the other way.
+ */
 .timer {
   --pct: 1;
-  width: 40px; height: 40px;
+  width: 44px; height: 44px;
   flex: none;
   border-radius: 50%;
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 0.82rem;
-  background:
-    radial-gradient(circle, rgba(7, 26, 37, 0.95) 64%, transparent 65%),
-    conic-gradient(var(--timer-color, var(--verdigris-bright)) calc(var(--pct) * 360deg), rgba(0, 0, 0, 0.45) 0);
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: conic-gradient(
+    rgba(7, 26, 37, 0.92) calc((1 - var(--pct)) * 360deg),
+    var(--timer-color, var(--verdigris-bright)) 0
+  );
   border: 1px solid var(--brass-dark);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
   color: var(--parchment);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.9);
 }
+/* A class selector beats the UA rule for [hidden], so say it here or
+   the empty dial sits beside the banner all game with no clock set. */
+.timer[hidden] { display: none; }
 .timer--warn { --timer-color: var(--brass-bright); }
-.timer--danger { --timer-color: var(--oxblood-bright); color: #ffd9d2; }
+.timer--danger { --timer-color: var(--oxblood-bright); color: #fff1ec; }
 
 /* ------------------------------------------------------------
    Player panels
@@ -170,7 +215,8 @@
 }
 
 .player-card {
-  padding: 0.6rem 0.72rem;
+  --card-pad: 0.72rem;
+  padding: 0.6rem var(--card-pad);
   background: linear-gradient(180deg, rgba(233, 220, 189, 0.94), rgba(200, 180, 138, 0.94));
   border: 1px solid var(--brass-dark);
   border-radius: var(--radius);
@@ -178,9 +224,41 @@
   transition: box-shadow 0.15s ease;
   position: relative;
 }
+/*
+ * Whose turn it is. The banner at the top says so in words, but in a
+ * four-player game the thing people actually look at is the panels, so
+ * the one on the clock breathes green.
+ */
 .player-card--active {
-  border-color: var(--brass);
-  box-shadow: var(--shadow-soft), inset 0 0 0 1px var(--brass), -3px 0 0 var(--brass);
+  border-color: var(--verdigris-bright);
+  animation: turn-pulse 1.9s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+  0%, 100% {
+    box-shadow:
+      var(--shadow-soft),
+      inset 0 0 0 1px var(--verdigris-bright),
+      0 0 0 1px rgba(79, 154, 126, 0.55),
+      0 0 9px rgba(79, 154, 126, 0.45);
+  }
+  50% {
+    box-shadow:
+      var(--shadow-soft),
+      inset 0 0 0 1px var(--verdigris-bright),
+      0 0 0 3px rgba(79, 154, 126, 0.75),
+      0 0 22px rgba(79, 154, 126, 0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-card--active {
+    animation: none;
+    box-shadow:
+      var(--shadow-soft),
+      inset 0 0 0 1px var(--verdigris-bright),
+      0 0 0 2px rgba(79, 154, 126, 0.7);
+  }
 }
 .player-card--winner { box-shadow: var(--shadow-soft), inset 0 0 0 2px var(--brass-bright); }
 
@@ -218,25 +296,43 @@
   border-radius: 2px;
   padding: 1px 4px;
 }
-/* The score wears the card's infamy seal; see .infamy-seal in base.css. */
-.player-card .infamy-seal { --seal-size: 1.8em; font-size: var(--seal); }
+/* The score: one skull and a running total. */
+.player-card .infamy-count { font-size: var(--seal); }
 
-/* Tokens in hand were half the size of the bonuses below them, which
-   made the smaller of the two numbers the harder one to read. */
-.player-card__gems {
-  display: flex;
+/*
+ * Tokens in hand and the bonuses below them share one six-column grid,
+ * so every bonus sits directly under the stone it discounts and the
+ * doubloon — which has no bonus — stands alone at the end of its row.
+ * Sizing comes from the grid rather than from each mark's own font, so
+ * the two rows cannot drift apart.
+ */
+.player-card__gems,
+.bonus-tally__row {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
   gap: 3px;
-  margin-bottom: 6px;
+}
+.player-card__gems { margin-bottom: 6px; }
+.player-card__gems .gem,
+.bonus-tally .bonus-disc {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
 }
 .player-card__gems .gem { font-size: var(--token); }
 
-/* Bonus tally — the headline number on each player card. */
+/*
+ * Bonus tally — the headline number on each player card. A band across
+ * the whole card rather than a boxed-in panel, so its grid is exactly
+ * as wide as the tokens above it and every bonus lands under the stone
+ * it discounts.
+ */
 .bonus-tally {
-  margin: 5px 0 6px;
-  padding: 4px 4px 5px;
+  margin: 5px calc(-1 * var(--card-pad)) 6px;
+  padding: 4px var(--card-pad) 5px;
   background: rgba(36, 24, 17, 0.14);
-  border: 1px solid rgba(107, 82, 34, 0.4);
-  border-radius: 3px;
+  border-top: 1px solid rgba(107, 82, 34, 0.35);
+  border-bottom: 1px solid rgba(107, 82, 34, 0.35);
 }
 .bonus-tally__label {
   display: block;
@@ -245,11 +341,8 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-soft);
-  text-align: center;
   margin-bottom: 3px;
 }
-/* Five seals across, centred. */
-.bonus-tally__row { display: flex; gap: 4px; justify-content: center; }
 .bonus-tally .bonus-disc { font-size: var(--seal); }
 
 .player-card__stat {
@@ -322,6 +415,14 @@
   color: var(--wood-dark);
   flex: 1;
 }
+/* The inspector's badge is dark, so its skulls are bone rather than
+   black and want no pale halo behind them. */
+.inspector__points .infamy-pips {
+  font-size: 1rem;
+  color: var(--parchment);
+}
+.inspector__points .infamy-pips__pip { filter: none; }
+.results__score .infamy-count { justify-content: flex-end; }
 .inspector__points {
   font-family: var(--font-display);
   font-weight: 700;
@@ -447,8 +548,9 @@
 /* A stowed card is the card, at 420x588 like the ones on the table,
    shown small. Nothing is redrawn or simplified. */
 .hold {
-  --hold-card-w: 94px;
-  --hold-card-h: 132px;
+  /* A third again as big as they were. Still 420:588, still the card. */
+  --hold-card-w: 127px;
+  --hold-card-h: 178px;
 }
 .hold__cards { display: flex; gap: 0.3rem; }
 .hold__card {
@@ -543,6 +645,7 @@
 }
 .lord-option:hover { transform: translateY(-3px); border-color: var(--brass); }
 .lord-option__mark { color: var(--wood-dark); margin-bottom: 0.3rem; }
+.lord-option__mark .infamy-pips { font-size: 1.25rem; }
 .lord-option__name {
   font-family: var(--font-display); font-weight: 600; font-size: 0.8rem;
   letter-spacing: 0.04em; color: var(--wood-dark); line-height: 1.25;
@@ -574,19 +677,21 @@
 
 @media (max-width: 900px) {
   .players { width: 196px; --token: 0.82rem; --seal: 0.86rem; }
+  .hud__banner { max-width: 52vw; }
+  .hold { --hold-card-w: 96px; --hold-card-h: 134px; }
   .log { display: none; }
 }
 
 @media (max-width: 640px) {
   :root { --hud-gap: 8px; }
   .players { width: 152px; --token: 0.64rem; --seal: 0.68rem; }
-  .player-card { padding: 0.5rem 0.5rem; }
+  .player-card { --card-pad: 0.5rem; padding: 0.5rem var(--card-pad); }
   .player-card__gems { gap: 2px; }
   .player-card__name { font-size: 0.78rem; }
   .action-bar { font-size: 0.85rem; padding: 0.45rem 0.55rem; gap: 0.45rem; }
   .turn-banner__phase { display: none; }
   /* Still a card, so still 420:588. */
-  .hold { --hold-card-w: 56px; --hold-card-h: 78px; }
+  .hold { --hold-card-w: 66px; --hold-card-h: 92px; }
 }
 
 .inspector__hint {

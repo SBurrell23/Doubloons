@@ -6,7 +6,7 @@
 // below, which is how the game teaches its own vocabulary.
 // ============================================================
 
-import { el, clear, append, gemChip } from './dom.js';
+import { el, clear, append, gemChip, bonusDisc } from './dom.js';
 
 let layer = null;
 let bubble = null;
@@ -58,7 +58,7 @@ export const GLOSSARY = {
   },
   lord: {
     title: 'Pirate Lords',
-    body: 'Worth 3 infamy each. A Lord joins you the moment your bonuses meet their demand — it costs no action and no gems, and you cannot turn one down.',
+    body: 'Worth 3 Infamy each. A Lord joins you the moment your bonuses meet their demand — it costs no action and no gems, and you cannot turn one down.',
     note: 'Bonuses only. Gems in hand never count.',
   },
   handLimit: {
@@ -75,7 +75,7 @@ export const GLOSSARY = {
   },
   lastRound: {
     title: 'Last round',
-    body: 'When someone reaches the target, play continues until everyone has had the same number of turns. Then the highest infamy wins.',
+    body: 'When someone reaches the target, play continues until everyone has had the same number of turns. Then the highest Infamy wins.',
     note: 'Ties go to whoever bought fewer cards.',
   },
   timer: {
@@ -106,9 +106,18 @@ function renderContent(content) {
   if (content.body) bubble.append(el('div.tooltip__body', {}, content.body));
   // After the sentence, not before it: a Lord's tile says "needs these
   // bonuses:" and the colon has to have something to point at.
+  //
+  // Gems are what you pay; bonuses are what you own. They are different
+  // things and they are drawn differently everywhere else, so a Lord's
+  // demands come through `bonuses` and wear the disc.
   if (content.gems) {
     const row = el('div.tooltip__gems');
     for (const [gem, count] of Object.entries(content.gems)) row.append(gemChip(gem, count, { size: 'sm' }));
+    bubble.append(row);
+  }
+  if (content.bonuses) {
+    const row = el('div.tooltip__gems');
+    for (const [gem, count] of Object.entries(content.bonuses)) row.append(bonusDisc(gem, count, { size: 'sm' }));
     bubble.append(row);
   }
   if (content.lines) {

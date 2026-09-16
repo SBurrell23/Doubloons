@@ -1,6 +1,7 @@
 // Minimal DOM helpers. No framework; the UI is small enough.
 
 import { play } from '../audio/sfx.js';
+import { icon } from './icons.js';
 
 /**
  * el('div.foo#bar', { attrs }, ...children)
@@ -197,11 +198,34 @@ export function bonusDisc(gem, count = null, { size = '', tip = null, empty = fa
   );
 }
 
-/** Infamy, in the same seal as the one struck on a card. */
-export function infamySeal(points, { size = '', tip = null } = {}) {
-  const classes = ['infamy-seal'];
-  if (size) classes.push(`infamy-seal--${size}`);
-  return el(`span.${classes.join('.')}`, { tip }, String(points));
+/**
+ * Infamy, counted: one skull per point, the way the cards and the Lord
+ * tiles print it. Good up to about five, which is as much as anything
+ * is worth on its own.
+ */
+export function infamyPips(points, { size = '', tip = null } = {}) {
+  const classes = ['infamy-pips'];
+  if (size) classes.push(`infamy-pips--${size}`);
+  const row = el(`span.${classes.join('.')}`, {
+    tip, role: 'img', 'aria-label': `${points} Infamy`,
+  });
+  for (let i = 0; i < points; i++) {
+    row.append(icon('skull', { size: '1em', className: 'infamy-pips__pip' }));
+  }
+  return row;
+}
+
+/**
+ * Infamy, totalled: one skull and a number. A running score climbs past
+ * fifteen, and nobody counts fifteen skulls.
+ */
+export function infamyCount(points, { size = '', tip = null } = {}) {
+  const classes = ['infamy-count'];
+  if (size) classes.push(`infamy-count--${size}`);
+  return el(`span.${classes.join('.')}`, { tip },
+    icon('skull', { size: '1.15em', className: 'infamy-count__skull' }),
+    el('span.infamy-count__n', {}, String(points)),
+  );
 }
 
 /** Format a cost object as a row of gem chips. */

@@ -511,8 +511,7 @@ body.gem-white .gem--onyx {
    learned twice. drawBonusDisc/drawInfamySeal paint the canvas twins.
    ------------------------------------------------------------ */
 
-.bonus-disc,
-.infamy-seal {
+.bonus-disc {
   --seal-size: 1.85em;
   display: inline-grid;
   place-items: center;
@@ -520,21 +519,22 @@ body.gem-white .gem--onyx {
   width: var(--seal-size);
   height: var(--seal-size);
   flex: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  font-size: 0.88rem;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 28%, #35271a, #120b05 72%);
   border: 2px solid var(--brass-bright);
   box-shadow: inset 0 0 0.25em rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.35);
-  font-family: var(--font-display);
-  font-weight: 700;
-  line-height: 1;
 }
 
-.bonus-disc { font-size: 0.88rem; }
-
-/* The stone itself, at the size the seal leaves it. */
+/* The stone itself, at the size the seal leaves it — a share of the
+   disc rather than a fixed em, so it keeps its proportions wherever
+   the disc is sized from something other than its font. */
 .bonus-disc__gem {
-  width: 1.32em;
-  height: 1.32em;
+  width: 72%;
+  height: 72%;
   font-size: inherit;
 }
 
@@ -559,14 +559,38 @@ body.gem-white .gem--onyx {
 .bonus-disc--none .bonus-disc__gem { opacity: 0.3; filter: grayscale(0.7); }
 .bonus-disc--none .bonus-disc__n { color: rgba(233, 220, 189, 0.5); }
 
-.infamy-seal {
+/*
+ * Infamy is skulls. One per point on anything worth a handful — a card,
+ * a Lord — because a row of them is counted at a glance with no digit
+ * to find and nothing to tell apart from the bonus beside it. Running
+ * totals get one skull and a number instead, since nobody counts
+ * fifteen. drawInfamyPips() prints the same row on the cards.
+ */
+.infamy-pips {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.08em;
   font-size: 0.92rem;
-  color: #ffeec2;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  color: #1b1109;
+  line-height: 1;
 }
+.infamy-pips__pip { flex: none; filter: drop-shadow(0 0 1px rgba(255, 240, 210, 0.7)); }
 
-.bonus-disc--sm, .infamy-seal--sm { font-size: 0.74rem; }
-.bonus-disc--lg, .infamy-seal--lg { font-size: 1.15rem; }
+.infamy-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18em;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #1b1109;
+  line-height: 1;
+}
+.infamy-count__skull { flex: none; }
+.infamy-count__n { font-size: 1.5em; letter-spacing: -0.01em; }
+
+.bonus-disc--sm, .infamy-pips--sm, .infamy-count--sm { font-size: 0.74rem; }
+.bonus-disc--lg, .infamy-pips--lg, .infamy-count--lg { font-size: 1.15rem; }
 
 /* ------------------------------------------------------------
    Utility

@@ -178,6 +178,13 @@ const ALIASES = {
 export const ICON_NAMES = [...Object.keys(FILLED), ...Object.keys(STROKED)];
 
 /**
+ * The skull on its own 24x24 grid. Infamy is branded with it on the
+ * cards, the Lord tiles, the player panels and the guide, and two of
+ * those four draw their own SVG rather than calling icon().
+ */
+export const SKULL_PATH = FILLED.skull;
+
+/**
  * Build an icon element.
  * `size` is a CSS length; the icon inherits the surrounding colour.
  */

@@ -3,7 +3,8 @@
 // ============================================================
 
 import {
-  el, button, clear, gemChip, costRow, bonusDisc, infamySeal, announce, trapFocus,
+  el, button, clear, gemChip, costRow, bonusDisc, infamyPips, infamyCount,
+  announce, trapFocus,
 } from './dom.js';
 import { play } from '../audio/sfx.js';
 import {
@@ -94,17 +95,18 @@ export function createHud(mount, {
     button(icon('leave', { size: '1.05rem' }), { class: 'btn-icon btn--danger', tip: 'Leave the table', 'aria-label': 'Leave the table', onClick: onLeave }),
   );
 
+  /*
+   * The HUD is one grid with named places rather than three stacked
+   * rows. The banner is centred on the screen instead of tucked in the
+   * corner, which frees the top-left for the player panels -- they
+   * start at the very top now, and the hold at the bottom has the room
+   * that bought.
+   */
   const root = el('div.hud', {},
-    el('div.hud__top', {},
-      el('div.row', {}, turnBanner, timerNode),
-      el('span.grow.pass-through'),
-      topRight,
-    ),
-    el('div.hud__middle', {},
-      playersNode,
-      el('span.grow.pass-through'),
-      logNode,
-    ),
+    el('div.hud__side', {}, playersNode),
+    el('div.hud__banner', {}, turnBanner, timerNode),
+    el('div.hud__tools', {}, topRight),
+    el('div.hud__log', {}, logNode),
     el('div.hud__bottom', {},
       holdNode,
       el('span.grow.pass-through'),
@@ -297,7 +299,7 @@ export function createHud(mount, {
         const owed = netCostView(card, player);
         content = {
           title: card.name,
-          body: `${TIER_INFO[card.tier].sub} · ${card.points} infamy · ${GEM_INFO[card.bonus].label} bonus`,
+          body: `${TIER_INFO[card.tier].sub} · ${card.points} Infamy · ${GEM_INFO[card.bonus].label} bonus`,
           note: Object.keys(owed).length === 0
             ? 'Your bonuses cover this entirely — it is free.'
             : (affordable(card, player) ? 'You can afford this.' : 'Not yet within reach.'),
@@ -315,8 +317,8 @@ export function createHud(mount, {
       if (lord) {
         content = {
           title: lord.name,
-          body: `${lord.title} — worth ${LORD_POINTS} infamy. Needs these bonuses:`,
-          gems: lord.req,
+          body: `${lord.title} — worth ${LORD_POINTS} Infamy. Needs these bonuses:`,
+          bonuses: lord.req,
         };
       }
     }
@@ -379,7 +381,9 @@ export function createHud(mount, {
     const node = el('div.inspector', {},
       el('div.inspector__head', {},
         el('div.inspector__name', {}, card.name),
-        card.points > 0 ? el('div.inspector__points', { tip: '#infamy' }, String(card.points)) : null,
+        card.points > 0
+          ? el('div.inspector__points', { tip: '#infamy' }, infamyPips(card.points, { size: 'lg' }))
+          : null,
       ),
       el('div.inspector__meta', {},
         `${TIER_INFO[card.tier].sub} · gives a `,
@@ -489,7 +493,7 @@ export function createHud(mount, {
     const node = el('div.inspector', {},
       el('div.inspector__head', {},
         el('div.inspector__name', {}, lord.name),
-        el('div.inspector__points', {}, '3'),
+        el('div.inspector__points', { tip: '#infamy' }, infamyPips(LORD_POINTS, { size: 'lg' })),
       ),
       el('div.inspector__meta', {}, lord.title),
       el('div.inspector__cost', {}, ...lines),
@@ -582,10 +586,7 @@ export function createHud(mount, {
       const tallyRow = el('div.bonus-tally__row');
       for (const gem of GEMS) {
         const n = bonuses[gem];
-        tallyRow.append(bonusDisc(gem, n, {
-          empty: !n,
-          tip: `${n} ${GEM_INFO[gem].label} bonus${n === 1 ? '' : 'es'}`,
-        }));
+        tallyRow.append(bonusDisc(gem, n, { empty: !n }));
       }
       tally.append(tallyRow);
 
@@ -597,7 +598,7 @@ export function createHud(mount, {
           el('span.player-card__name', {}, player.name),
           isMe ? el('span.player-card__you', {}, 'YOU') : null,
           player.isAI ? el('span.player-card__ai', {}, 'CPU') : null,
-          infamySeal(points, { tip: `${points} of ${target} infamy` }),
+          infamyCount(points, { tip: `${points} of ${target} Infamy` }),
         ),
         gemRow,
         tally,
@@ -631,7 +632,7 @@ export function createHud(mount, {
         type: 'button',
         tip: {
           title: card.name,
-          body: `${card.points} infamy · ${GEM_INFO[card.bonus].label} bonus`,
+          body: `${card.points} Infamy · ${GEM_INFO[card.bonus].label} bonus`,
           note: blind ? 'Stowed blind — only you can see this one.' : null,
         },
         onClick: (event) => {
@@ -956,7 +957,7 @@ export function createHud(mount, {
           session.submit({ type: 'chooseLord', lordId: lord.id });
         },
       },
-        el('div.lord-option__mark', {}, infamySeal(LORD_POINTS, { size: 'lg' })),
+        el('div.lord-option__mark', {}, infamyPips(LORD_POINTS, { size: 'lg' })),
         el('div.lord-option__name', {}, lord.name),
         el('div.lord-option__title', {}, lord.title),
         el('div.lord-option__req', {},
@@ -986,7 +987,7 @@ export function createHud(mount, {
         el('span.results__emblem', { style: { background: decor.color } }, seatEmblem(player?.seat ?? i, { size: '0.85rem' })),
         el('span.results__name', {}, entry.name, entry.isAI ? el('span.player-card__ai', {}, 'CPU') : null),
         el('span.results__detail', {}, `${entry.cards} cards · ${entry.lords} lords`),
-        el('span.results__score', {}, String(entry.points)),
+        el('span.results__score', {}, infamyCount(entry.points, { size: 'lg' })),
       ));
     });
 
@@ -1017,7 +1018,8 @@ export function createHud(mount, {
 
   let lastTickSecond = -1;
   function refreshTimer() {
-    if (!deadline || !view || view.phase === 'finished') {
+    // No clock set for this table means no dial, not an empty one.
+    if (!deadline || !view || !view.options.turnTimer || view.phase === 'finished') {
       timerNode.hidden = true;
       return;
     }
