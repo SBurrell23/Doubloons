@@ -15,20 +15,24 @@ const NS = 'http://www.w3.org/2000/svg';
  * somebody's portrait all at once.
  */
 /*
- * A high cranium that tapers to the cheekbones and hands down to a
+ * A broad cranium that tapers to the cheekbones and hands down to a
  * narrower jaw, and sockets cut as slanted wedges rather than drilled
  * as circles -- they fall toward the nose, which is the whole of the
  * difference between a skull that scowls and a skull that gawps.
+ *
+ * Width is the other half of it. Lean reads as a weasel and round
+ * reads as a smiley; this one is wide across the brow and cut away
+ * under the cheek, which is what makes it look like bone.
  */
 export const SKULL_SILHOUETTE =
-  'M12 1.3C7.7 1.3 4.6 5 4.6 9.7c0 2.6.8 4.6 2.2 6l1 1v2.9c0 1.7 1.3 3.1 3 3.1h2.4c1.7 0 3-1.4 3-3.1v-2.9l1-1c1.4-1.4 2.2-3.4 2.2-6C19.4 5 16.3 1.3 12 1.3z';
+  'M12 1.3C7 1.3 3.7 5 3.7 9.8c0 2.6.9 4.6 2.4 6l.9.9v2.9c0 1.7 1.3 3.1 3 3.1h4c1.7 0 3-1.4 3-3.1v-2.9l.9-.9c1.5-1.4 2.4-3.4 2.4-6C20.3 5 17 1.3 12 1.3z';
 export const SKULL_FEATURES =
-  'M6 7.9l5.2 2-.8 3.4-4.6-1z' +
-  'M18 7.9l-5.2 2 .8 3.4 4.6-1z' +
-  'M12 13.4l1.7 3.1h-3.4z' +
-  'M9.9 17.5h1v3.2h-1z' +
-  'M11.5 17.5h1v3.2h-1z' +
-  'M13.1 17.5h1v3.2h-1z';
+  'M5.3 7.7l5.9 2.1-.85 3.5-5.25-1.05z' +
+  'M18.7 7.7l-5.9 2.1.85 3.5 5.25-1.05z' +
+  'M12 13.3l1.9 3.2h-3.8z' +
+  'M9.45 17.5h1.1v3.3h-1.1z' +
+  'M11.45 17.5h1.1v3.3h-1.1z' +
+  'M13.45 17.5h1.1v3.3h-1.1z';
 
 /** How heavy the outline is, on the 24-unit grid. */
 export const SKULL_MARK_STROKE = 3.2;
