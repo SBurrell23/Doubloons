@@ -42,8 +42,29 @@ rules and broadcasts the state — clients only ever send intents, so
 nobody can make an illegal move by editing their own copy. Blind-stowed
 cards stay hidden from everyone else.
 
-If somebody drops mid-game, their seat keeps playing — the crew covers
-for them — so the table never stalls.
+### When things go wrong
+
+A game that starts should be a game that finishes, so every way a table
+can come apart has a way back:
+
+- **Somebody drops.** The whole table holds — nobody plays their hand
+  for them. They keep their seat, their cards and their turn, and
+  rejoining with the same code puts them straight back in it. A refresh
+  is not a resignation: the seat claim lives in `sessionStorage`.
+- **Somebody never comes back.** The table waits two minutes and then
+  the crew takes their seat and plays it out. The host can call it
+  earlier from the held overlay.
+- **A connection dies without saying so.** A frozen tab, a closed
+  laptop, a phone that lost its radio — none of these close the channel,
+  and a browser that is simply gone often never sends anything at all.
+  Both ends talk on a timer, so a long silence is read as absence and
+  the drop is handled like any other.
+- **The host refreshes.** The voyage is saved in `sessionStorage` after
+  every move. On reload the title screen offers to take the helm again:
+  the same room code is reclaimed and everyone else — still looping on
+  that code — walks back in by themselves.
+- **The room falls off the broker.** The host rebuilds it on the same
+  code and keeps trying for as long as the game lasts.
 
 You can also add computer captains at three difficulties, or play a solo
 game against them with no connection at all.
@@ -102,6 +123,24 @@ node scripts/ai-ladder.mjs 400
 Plays the three AI levels head to head in both seatings, to confirm the
 difficulty ladder is actually monotonic.
 
+### Checking the netcode
+
+```bash
+node scripts/netcode-sim.mjs 40
+```
+
+The sessions take their transport by injection, so the same host and
+client code that runs over WebRTC can be driven over a stand-in
+switchboard (`scripts/lib/fake-net.mjs`) that copies messages the way
+the JSON channel does, delivers them late, and — the interesting part —
+can stop carrying traffic without telling either end.
+
+On top of that it runs named scenarios (a drop and a return, a reload, a
+walkout, a grace expiry, a silent channel, a collapsed room, a host
+refresh, a hostile client) and then whole games with faults injected
+throughout. The assertion is the one that matters: every game finishes,
+and the host's state never leaves the set the rules engine allows.
+
 ## How it fits together
 
 ```
@@ -112,7 +151,8 @@ src/
     rules.js       pure rules engine — validate(), apply(), viewFor()
     ai.js          heuristic opponents; the top level does a one-ply
                    search over the position it would leave behind
-    session.js     host/client/solo sessions, turn clock, AI driver
+    session.js     host/client/solo sessions, turn clock, AI driver,
+                   liveness clocks and the host's saved voyage
   net/net.js       PeerJS transport, host-authoritative
   three/           scene, island props, board, procedural textures
   ui/              title, lobby, HUD, settings, guide, tooltips, icons

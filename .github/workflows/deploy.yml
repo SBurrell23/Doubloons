@@ -36,6 +36,13 @@ jobs:
         # conservation, card counts and the hand/hold limits.
         run: node scripts/simulate.mjs 200
 
+      - name: Check the netcode
+        # Whole multiplayer games over a stand-in transport while
+        # players drop, freeze, reload and walk away, the room falls off
+        # the broker, and the host itself refreshes. Every game has to
+        # finish.
+        run: node scripts/netcode-sim.mjs 20
+
       - name: Build
         run: npm run build
         env:

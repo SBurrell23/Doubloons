@@ -15,6 +15,7 @@ import { icon, seatEmblem } from './icons.js';
 
 export function renderTitle(mount, {
   name, onNameChange, onSolo, onHost, onJoin, onHowTo, onSettings, joinCodeFromUrl,
+  resumable = null, onResume, onDiscardResume,
 }) {
   clear(mount);
 
@@ -62,6 +63,28 @@ export function renderTitle(mount, {
       el('p.title__tag', {}, 'Gems, galleons and a reputation worth hanging for.'),
 
       el('div.title__name-row', {}, nameInput),
+
+      // This tab was hosting a game when it reloaded. The room code is
+      // still the one the crew is knocking on.
+      resumable ? el('div.title__resume', {},
+        el('div.grow', {},
+          el('div.title__resume-title', {}, 'A voyage is still under way'),
+          el('div.title__resume-sub', {},
+            resumable.phase === 'playing' ? 'Table ' : 'Lobby ',
+            el('b', {}, resumable.code),
+            ' is waiting for its host.'),
+        ),
+        button('Take the helm', {
+          class: 'btn--gold btn--sm',
+          onClick: () => onResume(status),
+        }),
+        button(icon('close', { size: '0.8rem' }), {
+          class: 'btn--ghost btn--sm',
+          'aria-label': 'Forget that voyage',
+          tip: 'Forget it and start fresh.',
+          onClick: () => onDiscardResume(),
+        }),
+      ) : null,
 
       el('div.title__actions', {},
         button([icon('cutlasses'), 'Play the Crew'], {

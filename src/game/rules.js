@@ -188,9 +188,17 @@ function refillSlot(state, tier, index) {
 
 /**
  * Returns { ok: true } or { ok: false, reason }. Never mutates.
+ *
+ * Everything reaching here from a client is untrusted: the host runs
+ * this on intents that arrived over the wire, so it has to survive any
+ * shape at all, not just the ones our own UI sends. Nothing below may
+ * throw -- a throw on the host is a stalled table for everybody.
  */
 export function validate(state, playerId, action) {
   if (state.phase === 'finished') return fail('The voyage is already over.');
+  if (!action || typeof action !== 'object' || typeof action.type !== 'string') {
+    return fail('Unknown action.');
+  }
   const player = playerById(state, playerId);
   if (!player) return fail('Unknown player.');
 
@@ -203,7 +211,7 @@ export function validate(state, playerId, action) {
   if (state.phase === 'chooseLord') {
     if (state.pending?.playerId !== playerId) return fail('Not your choice.');
     if (action.type !== 'chooseLord') return fail('You must choose a Pirate Lord first.');
-    if (!state.pending.options.includes(action.lordId)) return fail('That Lord is not offering.');
+    if (!(state.pending.options || []).includes(action.lordId)) return fail('That Lord is not offering.');
     return ok();
   }
 
@@ -222,8 +230,17 @@ export function validate(state, playerId, action) {
 const ok = () => ({ ok: true });
 const fail = (reason) => ({ ok: false, reason });
 
+/**
+ * Token counts are whole numbers or they are nothing. A client that
+ * offers to pay half a ruby used to be taken at its word, which bought
+ * cards at a discount and left fractions rattling around the chest
+ * forever.
+ */
+const isCount = (value) => typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
 function validateTakeThree(state, action) {
-  const gems = action.gems || [];
+  const gems = action.gems;
+  if (!Array.isArray(gems)) return fail('Pick at least one gem.');
   if (gems.length === 0) return fail('Pick at least one gem.');
   if (gems.length > 3) return fail('Three gems at most.');
   if (new Set(gems).size !== gems.length) return fail('Gems must be different colours.');
@@ -271,30 +288,36 @@ function validatePurchase(state, player, action) {
   }
 
   const owed = netCost(card, player);
+  if (action.payment !== undefined && action.payment !== null
+      && (typeof action.payment !== 'object' || Array.isArray(action.payment))) {
+    return fail('Bad payment.');
+  }
   const payment = action.payment || autoPayment(card, player);
   if (!payment) return fail('You cannot pay for that card.');
 
   let goldShortfall = 0;
   for (const gem of GEMS) {
-    const paid = payment[gem] || 0;
+    const paid = payment[gem] === undefined ? 0 : payment[gem];
     const need = owed[gem] || 0;
-    if (paid < 0) return fail('Bad payment.');
+    if (!isCount(paid)) return fail('Bad payment.');
     if (paid > need) return fail('You are overpaying.');
     if (paid > (player.tokens[gem] || 0)) return fail('You do not hold those tokens.');
     goldShortfall += need - paid;
   }
-  const gold = payment[GOLD] || 0;
+  const gold = payment[GOLD] === undefined ? 0 : payment[GOLD];
+  if (!isCount(gold)) return fail('Bad payment.');
   if (gold !== goldShortfall) return fail('Doubloons do not cover the difference.');
   if (gold > (player.tokens[GOLD] || 0)) return fail('You do not hold that many doubloons.');
   return ok();
 }
 
 function validateDiscard(state, player, action) {
-  const tokens = action.tokens || {};
+  const tokens = action.tokens;
+  if (!tokens || typeof tokens !== 'object' || Array.isArray(tokens)) return fail('Bad discard.');
   let total = 0;
   for (const [token, amount] of Object.entries(tokens)) {
     if (!ALL_TOKENS.includes(token)) return fail('Unknown token.');
-    if (amount < 0) return fail('Bad discard.');
+    if (!isCount(amount)) return fail('Bad discard.');
     if (amount > (player.tokens[token] || 0)) return fail('You do not hold those.');
     total += amount;
   }

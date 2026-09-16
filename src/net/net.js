@@ -31,6 +31,8 @@ export function normaliseCode(input) {
 
 const peerIdFor = (code) => `${ID_PREFIX}${code}`;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** PeerJS defaults to its public broker, which is what we want here. */
 function makePeer(id) {
   return new Peer(id, {
@@ -72,10 +74,33 @@ export class Host extends Emitter {
     this.destroyed = false;
     this._retryTimer = 0;
     this._retries = 0;
+    this._reopenTimer = 0;
+    this._reopens = 0;
   }
 
-  /** Claim a room code. Retries on collision. */
-  async open(attempts = 6) {
+  /**
+   * Claim a room code. Retries on collision.
+   *
+   * `preferred` is for picking a voyage back up after the host reloaded:
+   * the same code has to come back or nobody can rejoin. The broker
+   * holds a dropped id for a few seconds, so that case waits and tries
+   * again rather than giving up and minting a new room.
+   */
+  async open(preferred = null, attempts = 6) {
+    if (preferred) {
+      for (let i = 0; i < 8; i++) {
+        try {
+          await this._tryOpen(preferred);
+          this.code = preferred;
+          return preferred;
+        } catch (error) {
+          if (error?.type !== 'unavailable-id') throw error;
+          await sleep(1000 + i * 500);
+        }
+      }
+      throw new Error('That room code is still held by the old table. Try again in a moment.');
+    }
+
     for (let i = 0; i < attempts; i++) {
       const code = randomCode(4);
       try {
@@ -156,9 +181,38 @@ export class Host extends Emitter {
       this._scheduleReconnect(peer);
     });
 
+    /*
+     * A destroyed peer forfeits the room id, and a room nobody can
+     * reach is a game nobody can rejoin. PeerJS only destroys after a
+     * fatal broker error, which is exactly when we most need to come
+     * back, so rebuild the peer on the same code instead of giving up.
+     * The data channels went with it, but every client is already
+     * looping on the same code, so they find the room again.
+     */
     peer.on('close', () => {
-      if (!this.destroyed) this.emit('status', 'closed');
+      if (this.destroyed) return;
+      this.emit('status', 'closed');
+      this.connections.clear();
+      this._scheduleReopen();
     });
+  }
+
+  _scheduleReopen() {
+    if (this.destroyed || this._reopenTimer || !this.code) return;
+    const wait = Math.min(20000, 1500 * 2 ** Math.min(this._reopens, 4));
+    this._reopens += 1;
+    this._reopenTimer = setTimeout(async () => {
+      this._reopenTimer = 0;
+      if (this.destroyed) return;
+      try {
+        await this._tryOpen(this.code);
+        this._reopens = 0;
+        this.emit('status', 'online');
+        this.emit('reopened');
+      } catch {
+        this._scheduleReopen();
+      }
+    }, wait);
   }
 
   /*
@@ -170,13 +224,18 @@ export class Host extends Emitter {
    */
   _scheduleReconnect(peer) {
     if (this.destroyed || this._retryTimer) return;
-    if (this._retries >= 8) { this.emit('status', 'offline'); return; }
-    const wait = Math.min(30000, 1000 * 2 ** this._retries);
+    // Never stop trying. Backing off to half a minute is cheap, and a
+    // host that quietly stops listening is a room that can never be
+    // rejoined for the rest of the game.
+    if (this._retries === 8) this.emit('status', 'offline');
+    const wait = Math.min(30000, 1000 * 2 ** Math.min(this._retries, 5));
     this._retries += 1;
     this._retryTimer = setTimeout(() => {
       this._retryTimer = 0;
-      if (this.destroyed || peer.destroyed || !peer.disconnected) return;
-      try { peer.reconnect(); } catch { /* the error event covers it */ }
+      if (this.destroyed) return;
+      if (peer.destroyed) { this._scheduleReopen(); return; }
+      if (!peer.disconnected) return;
+      try { peer.reconnect(); } catch { this._scheduleReopen(); }
     }, wait);
   }
 
@@ -207,7 +266,9 @@ export class Host extends Emitter {
   destroy() {
     this.destroyed = true;
     clearTimeout(this._retryTimer);
+    clearTimeout(this._reopenTimer);
     this._retryTimer = 0;
+    this._reopenTimer = 0;
     for (const conn of this.connections.values()) {
       try { conn.close(); } catch { /* already gone */ }
     }
@@ -337,10 +398,13 @@ export const MSG = {
   ACTION: 'action',
   CHAT: 'chat',
   LEAVE: 'leave',
+  PING: 'ping',        // keeps the host's liveness clock happy
+  ACK: 'ack',          // { version } -- this snapshot arrived and rendered
   // host -> client
   WELCOME: 'welcome',
   SEATED: 'seated',    // { seatId, token } -- your identity across reconnects
-  PAUSE: 'pause',      // { waiting: [names] } -- empty list means resumed
+  PONG: 'pong',
+  PAUSE: 'pause',      // { waiting: [names], until } -- empty list means resumed
   LOBBY: 'lobby',
   STATE: 'state',
   EFFECTS: 'effects',
