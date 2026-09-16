@@ -15,14 +15,17 @@ const NS = 'http://www.w3.org/2000/svg';
  * somebody's portrait all at once.
  */
 export const SKULL_SILHOUETTE =
-  'M12 2.2c-4.3 0-7.8 3.3-7.8 7.5 0 2.4 1.1 4.5 2.8 5.8v2.7c0 1.3 1 2.3 2.3 2.3h5.4c1.3 0 2.3-1 2.3-2.3v-2.7c1.7-1.3 2.8-3.4 2.8-5.8 0-4.2-3.5-7.5-7.8-7.5z';
+  'M12 2.2c-3.65 0-6.6 3.3-6.6 7.5 0 2.4 1 4.5 2.6 5.8v2.7c0 1.3 1 2.3 2.3 2.3h3.4c1.3 0 2.3-1 2.3-2.3v-2.7c1.6-1.3 2.6-3.4 2.6-5.8 0-4.2-2.95-7.5-6.6-7.5z';
 export const SKULL_FEATURES =
-  'M9.1 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
-  'M14.9 7.9a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' +
-  'M12 13.6l1.5 2.6h-3z' +
-  'M9.2 17.3h1.3v2.1H9.2z' +
+  'M9.7 8.05a2.35 2.35 0 1 0 0 4.7 2.35 2.35 0 0 0 0-4.7z' +
+  'M14.3 8.05a2.35 2.35 0 1 0 0 4.7 2.35 2.35 0 0 0 0-4.7z' +
+  'M12 13.7l1.3 2.4h-2.6z' +
+  'M9.6 17.3h1.3v2.1H9.6z' +
   'M11.35 17.3h1.3v2.1h-1.3z' +
-  'M13.5 17.3h1.3v2.1h-1.3z';
+  'M13.1 17.3h1.3v2.1h-1.3z';
+
+/** How heavy the outline is, on the 24-unit grid. */
+export const SKULL_MARK_STROKE = 2.4;
 
 /** Bone, and the dark it is drawn against. */
 export const MARK_BONE = '#f7ecd2';
@@ -232,7 +235,7 @@ export function drawSkullMark(ctx, cx, cy, size) {
   ctx.scale(size / 24, size / 24);
   const body = new Path2D(SKULL_SILHOUETTE);
   ctx.lineJoin = 'round';
-  ctx.lineWidth = 1.7;
+  ctx.lineWidth = SKULL_MARK_STROKE;
   ctx.strokeStyle = MARK_INK;
   ctx.stroke(body);
   ctx.fillStyle = MARK_BONE;

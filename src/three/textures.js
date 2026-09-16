@@ -398,20 +398,30 @@ export function drawBonusDisc(ctx, cx, cy, r, gem, amount = null) {
 export function drawInfamyMark(ctx, left, cy, count, { size = 100 } = {}) {
   drawSkullMark(ctx, left + size / 2, cy, size);
 
-  const text = `\u00d7${count}`;
   ctx.save();
-  ctx.font = `700 ${Math.round(size * 0.56)}px Cinzel, Georgia, serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  ctx.lineWidth = Math.max(3, size * 0.09);
+  ctx.lineWidth = Math.max(3, size * 0.1);
   ctx.strokeStyle = MARK_INK;
-  ctx.strokeText(text, left + size * 1.02, cy + size * 0.02);
   ctx.fillStyle = MARK_BONE;
-  ctx.fillText(text, left + size * 1.02, cy + size * 0.02);
-  const width = size * 1.02 + ctx.measureText(text).width;
+
+  // The times sign and the number are drawn separately: set as one
+  // string the x sits right up against the digit.
+  const baseline = cy + size * 0.02;
+  let x = left + size * 0.86;
+  const stamp = (text, fontSize) => {
+    ctx.font = `700 ${Math.round(fontSize)}px Cinzel, Georgia, serif`;
+    ctx.strokeText(text, x, baseline);
+    ctx.fillText(text, x, baseline);
+    x += ctx.measureText(text).width;
+  };
+  stamp('\u00d7', size * 0.44);
+  x += size * 0.06;
+  stamp(String(count), size * 0.56);
+
   ctx.restore();
-  return width;
+  return x - left;
 }
 
 /** Gold coin face, for doubloons. */
@@ -436,18 +446,40 @@ export function drawDoubloon(ctx, cx, cy, r) {
   ctx.lineWidth = Math.max(1, r * 0.06);
   ctx.stroke();
 
-  // A crude skull stamped in the middle.
-  ctx.fillStyle = 'rgba(96,66,14,0.8)';
-  ctx.beginPath();
-  ctx.arc(0, -r * 0.08, r * 0.30, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(-r * 0.20, r * 0.12, r * 0.40, r * 0.20);
-  ctx.fillStyle = '#f2d27e';
-  ctx.beginPath();
-  ctx.arc(-r * 0.12, -r * 0.10, r * 0.085, 0, Math.PI * 2);
-  ctx.arc(r * 0.12, -r * 0.10, r * 0.085, 0, Math.PI * 2);
-  ctx.fill();
+  // A compass rose, struck in the middle. It used to be a skull, which
+  // is now what Infamy is counted in -- a coin wearing one read like a
+  // point rather than a currency.
+  compassRose(ctx, 0, 0, r * 0.52, 'rgba(96,66,14,0.8)', '#f2d27e');
   ctx.restore();
+}
+
+/**
+ * An eight-point rose. Long points north, south, east and west, short
+ * ones between, each split down the middle so the two halves catch the
+ * light differently -- which is what makes a flat drawing look struck.
+ */
+function compassRose(ctx, cx, cy, r, dark, light) {
+  const point = (angle, length, width) => {
+    const tip = [cx + Math.cos(angle) * length, cy + Math.sin(angle) * length];
+    const l = [cx + Math.cos(angle + Math.PI / 2) * width, cy + Math.sin(angle + Math.PI / 2) * width];
+    const rt = [cx + Math.cos(angle - Math.PI / 2) * width, cy + Math.sin(angle - Math.PI / 2) * width];
+    ctx.fillStyle = light;
+    ctx.beginPath();
+    ctx.moveTo(...tip); ctx.lineTo(...l); ctx.lineTo(cx, cy); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(...tip); ctx.lineTo(...rt); ctx.lineTo(cx, cy); ctx.closePath();
+    ctx.fill();
+  };
+
+  for (let i = 0; i < 4; i++) point(i * Math.PI / 2, r, r * 0.17);
+  for (let i = 0; i < 4; i++) point(Math.PI / 4 + i * Math.PI / 2, r * 0.6, r * 0.12);
+
+  ctx.fillStyle = dark;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 0.13, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function shade(hex, factor) {
@@ -510,7 +542,9 @@ const TIER_ACCENT = { 1: '#6b8f3a', 2: '#2f6f96', 3: '#8d3a6b' };
 export const ART_PANEL = { x: 32, y: 194, w: 356, h: 198 };
 
 /** Where a Pirate Lord's portrait lives on their tile. */
-export const LORD_ART_PANEL = { x: 44, y: 34, w: 332, h: 214 };
+export const LORD_W = 420;
+export const LORD_H = 500;
+export const LORD_ART_PANEL = { x: 44, y: 116, w: 332, h: 206 };
 
 export function cardFaceCanvas(card) {
   const { el, ctx } = canvas(CARD_W, CARD_H);
@@ -694,17 +728,17 @@ export function cardBackTexture(tier) {
 
 /** A Pirate Lord tile. */
 export function lordCanvas(lord) {
-  const size = 420;
-  const { el, ctx } = canvas(size, size);
-  parchment(ctx, size, size, lord.id.length * 5);
+  const size = LORD_W;
+  const { el, ctx } = canvas(LORD_W, LORD_H);
+  parchment(ctx, LORD_W, LORD_H, lord.id.length * 5);
 
   ctx.strokeStyle = '#6b4a10';
   ctx.lineWidth = 12;
-  roundRect(ctx, 8, 8, size - 16, size - 16, 24);
+  roundRect(ctx, 8, 8, LORD_W - 16, LORD_H - 16, 24);
   ctx.stroke();
   ctx.strokeStyle = '#d9b978';
   ctx.lineWidth = 4;
-  roundRect(ctx, 22, 22, size - 44, size - 44, 18);
+  roundRect(ctx, 22, 22, LORD_W - 44, LORD_H - 44, 18);
   ctx.stroke();
 
   // Portrait. Falls back to a tricorn silhouette if this Lord has no
@@ -736,10 +770,16 @@ export function lordCanvas(lord) {
   ctx.lineTo(px + pw, py + ph);
   ctx.stroke();
 
-  // Stamped across the portrait's corner, like a mark on a warrant --
-  // the same mark a card wears, because it is the same three Infamy.
-  // The dark outline is what lets it sit on a portrait at all.
-  drawInfamyMark(ctx, 36, 74, LORD_POINTS, { size: 88 });
+  // What it is worth, in its own band above the portrait. It used to be
+  // stamped across the picture, which is fine for a warrant and less
+  // fine for the one drawing on the tile.
+  drawInfamyMark(ctx, 40, 70, LORD_POINTS, { size: 84 });
+  ctx.strokeStyle = 'rgba(107,74,16,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(px, 112);
+  ctx.lineTo(px + pw, 112);
+  ctx.stroke();
 
   // Name. Alignment is set here rather than inherited from whatever
   // drew last -- that is how the name ended up running off the edge.
@@ -747,17 +787,18 @@ export function lordCanvas(lord) {
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#3a2410';
   ctx.font = '600 27px Cinzel, Georgia, serif';
-  wrapText(ctx, lord.name, size / 2, 276, size - 70, 32);
+  wrapText(ctx, lord.name, size / 2, 356, size - 70, 32);
   ctx.fillStyle = '#6b4a10';
   ctx.font = 'italic 21px Spectral, Georgia, serif';
-  ctx.fillText(lord.title, size / 2, 308);
+  ctx.fillText(lord.title, size / 2, 390);
 
-  // Requirements -- bonuses, so they wear the bonus seal.
+  // Requirements -- bonuses, so they wear the bonus seal. They sit
+  // clear of the border now rather than pressed against it.
   const reqs = Object.entries(lord.req);
   const gap = 104;
   const startX = size / 2 - ((reqs.length - 1) * gap) / 2;
   reqs.forEach(([gem, n], i) => {
-    drawBonusDisc(ctx, startX + i * gap, 366, 46, gem, n);
+    drawBonusDisc(ctx, startX + i * gap, 442, 46, gem, n);
   });
 
   return el;
@@ -857,39 +898,10 @@ function paintCoin(ctx, size, colours) {
     ctx.fill();
   }
 
-  // Skull in relief.
-  const s = size * 0.26;
-  ctx.fillStyle = colours.high;
-  ctx.beginPath();
-  ctx.arc(c, c - s * 0.16, s * 0.62, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillRect(c - s * 0.34, c + s * 0.3, s * 0.68, s * 0.42);
-
-  ctx.fillStyle = colours.deep;
-  ctx.beginPath();
-  ctx.arc(c - s * 0.26, c - s * 0.2, s * 0.2, 0, Math.PI * 2);
-  ctx.arc(c + s * 0.26, c - s * 0.2, s * 0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.moveTo(c, c + s * 0.02);
-  ctx.lineTo(c + s * 0.13, c + s * 0.26);
-  ctx.lineTo(c - s * 0.13, c + s * 0.26);
-  ctx.closePath();
-  ctx.fill();
-  for (let i = -1; i <= 1; i++) {
-    ctx.fillRect(c + i * s * 0.22 - s * 0.035, c + s * 0.34, s * 0.07, s * 0.34);
-  }
-
-  // Crossed bones behind the jaw.
-  ctx.strokeStyle = colours.high;
-  ctx.lineWidth = size * 0.035;
-  ctx.lineCap = 'round';
-  for (const dir of [-1, 1]) {
-    ctx.beginPath();
-    ctx.moveTo(c - dir * s * 0.95, c + s * 1.02);
-    ctx.lineTo(c + dir * s * 0.95, c + s * 0.6);
-    ctx.stroke();
-  }
+  // A compass rose in relief, where the skull and crossbones used to
+  // be. Infamy is counted in skulls now, and a coin that wore one read
+  // like a score rather than a currency.
+  compassRose(ctx, c, c, size * 0.3, colours.deep, colours.high);
 }
 
 /** The gold colour map for a doubloon. */

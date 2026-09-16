@@ -12,7 +12,10 @@ import { gemGeometry, coinGeometry, makeGemMaterial } from './props.js';
 export const CARD_W = 1.46;
 export const CARD_H = 2.04;
 const CARD_T = 0.032;
-const LORD_SIZE = 1.12;
+// The Lord tiles are taller than they are wide, like the texture on
+// them; they used to be square and the artwork had nowhere to go.
+const LORD_W = 1.08;
+const LORD_D = 1.29;
 
 const COL_X = [-3.36, -1.68, 0, 1.68, 3.36];
 const ROW_Z = { 3: -2.35, 2: -0.05, 1: 2.25 };
@@ -111,7 +114,7 @@ function makeBackMesh(tier, geometry) {
 }
 
 function makeLordMesh(lord) {
-  const geo = new THREE.BoxGeometry(LORD_SIZE, 0.06, LORD_SIZE);
+  const geo = new THREE.BoxGeometry(LORD_W, 0.06, LORD_D);
   const texture = lordTexture(lord);
   const materials = [
     edgeMaterial, edgeMaterial,
@@ -227,7 +230,7 @@ export function createBoard(world, { onPick, onHover } = {}) {
     const holder = new THREE.Group();
     holder.position.set(0, 0.03, LORD_Z);
     root.add(holder);
-    const highlight = makeHighlight(LORD_SIZE, LORD_SIZE, 0xffe9a8);
+    const highlight = makeHighlight(LORD_W, LORD_D, 0xffe9a8);
     highlight.position.y = 0.012;
     holder.add(highlight);
     lordSlots.push({ holder, highlight, mesh: null, lord: null });
@@ -478,7 +481,7 @@ export function createBoard(world, { onPick, onHover } = {}) {
     // Re-centre the row as tiles are claimed.
     const live = lordSlots.filter((s) => s.lord);
     live.forEach((slot, i) => {
-      const x = (i - (live.length - 1) / 2) * (LORD_SIZE + 0.22);
+      const x = (i - (live.length - 1) / 2) * (LORD_W + 0.24);
       slot.holder.position.x = x;
     });
 

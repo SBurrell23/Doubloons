@@ -324,14 +324,19 @@
   gap: 3px;
 }
 .player-card__gems { margin-bottom: 4px; }
+/* Both rows keep the same six columns — that is what holds them in
+   line — but a bare stone sits a little smaller in its cell than a
+   sealed one, which is the difference between what you hold and what
+   you own. */
 .player-card__gems .gem,
 .bonus-tally .bonus-disc {
-  width: 100%;
   max-width: var(--mark-max);
   height: auto;
   aspect-ratio: 1;
   justify-self: center;
 }
+.player-card__gems .gem { width: 87%; }
+.bonus-tally .bonus-disc { width: 100%; }
 .player-card__gems .gem { font-size: var(--token); }
 
 /*

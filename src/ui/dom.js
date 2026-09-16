@@ -213,7 +213,10 @@ function infamyMark(points, { times, size, tip }) {
     tip, role: 'img', 'aria-label': `${points} Infamy`,
   },
     skullMark({ size: '1em', className: 'infamy-mark__skull' }),
-    el('span.infamy-mark__n', {}, times ? `\u00d7${points}` : String(points)),
+    // The times sign carries its own trailing space; kerned against the
+    // digit it reads as one glyph.
+    times ? el('span.infamy-mark__times', {}, '\u00d7') : null,
+    el('span.infamy-mark__n', {}, String(points)),
   );
 }
 
