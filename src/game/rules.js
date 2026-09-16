@@ -204,6 +204,13 @@ export function validate(state, playerId, action) {
 
   if (state.phase === 'discard') {
     if (state.pending?.playerId !== playerId) return fail('Not your discard.');
+    // Taking gems you cannot hold is nearly always a misclick, and the
+    // only way out used to be to pick which ones to throw away. If the
+    // gems are still exactly where the take put them, they can go back.
+    if (action.type === 'undoTake') {
+      if (!state.pending.undo) return fail('That move cannot be taken back.');
+      return ok();
+    }
     if (action.type !== 'discard') return fail('You must return tokens first.');
     return validateDiscard(state, player, action);
   }
@@ -336,13 +343,26 @@ export function apply(state, playerId, action) {
   const player = playerById(state, playerId);
   const effects = [];
 
+  // What the counters below were before this action, so a take that is
+  // handed straight back can leave them exactly as it found them.
+  const priorProgress = {
+    consecutivePasses: state.consecutivePasses,
+    idleTurns: state.idleTurns,
+  };
+
   // Progress tracking. A turn only counts as progress if a card moved;
   // shuffling tokens around forever is how the table can lock up.
+  // Mid-turn steps -- returning tokens, picking a Lord, putting a take
+  // back -- are not turns and do not count either way.
+  const midTurn = action.type === 'discard'
+    || action.type === 'chooseLord'
+    || action.type === 'undoTake';
+
   if (action.type === 'pass') state.consecutivePasses++;
-  else if (action.type !== 'discard' && action.type !== 'chooseLord') state.consecutivePasses = 0;
+  else if (!midTurn) state.consecutivePasses = 0;
 
   if (action.type === 'purchase' || action.type === 'reserve') state.idleTurns = 0;
-  else if (action.type !== 'discard' && action.type !== 'chooseLord') state.idleTurns++;
+  else if (!midTurn) state.idleTurns++;
 
   switch (action.type) {
     case 'takeThree': {
@@ -415,6 +435,23 @@ export function apply(state, playerId, action) {
       pushLog(state, { kind: 'pass', who: player.name });
       break;
     }
+    case 'undoTake': {
+      const { gems, priorProgress: restore } = state.pending.undo;
+      for (const gem of gems) {
+        player.tokens[gem]--;
+        state.supply[gem]++;
+      }
+      pushLog(state, { kind: 'undo', who: player.name, gems });
+      effects.push({ type: 'undo', to: player.id, gems });
+      // Back to the top of their turn, exactly as it was: same player,
+      // same turn, and the deadlock counters never saw the take.
+      state.phase = 'playing';
+      state.pending = null;
+      state.consecutivePasses = restore.consecutivePasses;
+      state.idleTurns = restore.idleTurns;
+      state.version++;
+      return effects;
+    }
     case 'discard': {
       for (const [token, amount] of Object.entries(action.tokens)) {
         player.tokens[token] -= amount;
@@ -444,6 +481,11 @@ export function apply(state, playerId, action) {
     state.pending = {
       playerId: player.id,
       excess: countTokens(player.tokens) - MAX_TOKENS_HELD,
+      // Only a gem grab can be handed back: nothing else has happened
+      // yet, so putting the stones down is the whole of the undo. A
+      // stow has already moved a card and turned the deck over, and
+      // unpicking that would show people a card they should not see.
+      undo: undoableTake(action, priorProgress),
     };
     state.version++;
     return effects;
@@ -452,6 +494,17 @@ export function apply(state, playerId, action) {
   finishTurn(state, player, effects);
   state.version++;
   return effects;
+}
+
+/**
+ * The gems an action put in a player's hand, if handing them straight
+ * back would leave the game exactly as it was. Anything that moved a
+ * card is not on the list.
+ */
+function undoableTake(action, priorProgress) {
+  if (action.type === 'takeThree') return { gems: [...action.gems], priorProgress };
+  if (action.type === 'takeTwo') return { gems: [action.gem, action.gem], priorProgress };
+  return null;
 }
 
 function tierName(tier) {
@@ -540,6 +593,8 @@ export function legalActions(state, playerId) {
   if (!player) return [];
   const actions = [];
 
+  // A discard is chosen in the prompt, not from a list of moves, and the
+  // crew never hands its gems back.
   if (state.phase === 'discard' && state.pending?.playerId === playerId) return [];
   if (state.phase === 'chooseLord' && state.pending?.playerId === playerId) {
     return state.pending.options.map((lordId) => ({ type: 'chooseLord', lordId }));

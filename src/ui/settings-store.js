@@ -21,7 +21,7 @@ export const DEFAULTS = {
     confirmPurchase: false,
     highlightAffordable: true,
     animationSpeed: 1,
-    colourblindLabels: false,
+    whiteGem: false,
     autoPassTokens: true,
     showLegalOnly: true,
   },

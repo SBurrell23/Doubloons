@@ -18,13 +18,31 @@ export const ALL_TOKENS = [...GEMS, GOLD];
  * as white and black against the table.
  */
 export const GEM_INFO = {
-  pearl: { label: 'Amber', short: 'Amb', hex: 0xdd7a1e, ui: '#f0942c', dark: '#7d3f06' },
-  sapphire: { label: 'Sapphire', short: 'Sph', hex: 0x2e6fd6, ui: '#4f8ef0', dark: '#1b3f80' },
-  emerald: { label: 'Emerald', short: 'Eme', hex: 0x24a95f, ui: '#35c274', dark: '#146138' },
-  ruby: { label: 'Ruby', short: 'Rby', hex: 0xd4343c, ui: '#ef5159', dark: '#7d1a20' },
-  onyx: { label: 'Amethyst', short: 'Amy', hex: 0x7b3aa8, ui: '#9b57c6', dark: '#3d1a57' },
-  doubloon: { label: 'Doubloon', short: 'Dbl', hex: 0xe8b53a, ui: '#f0c34c', dark: '#8a6414' },
+  pearl: { label: 'Amber', hex: 0xdd7a1e, ui: '#f0942c', dark: '#7d3f06' },
+  sapphire: { label: 'Sapphire', hex: 0x2e6fd6, ui: '#4f8ef0', dark: '#1b3f80' },
+  emerald: { label: 'Emerald', hex: 0x24a95f, ui: '#35c274', dark: '#146138' },
+  ruby: { label: 'Ruby', hex: 0xd4343c, ui: '#ef5159', dark: '#7d1a20' },
+  onyx: { label: 'Amethyst', hex: 0x7b3aa8, ui: '#9b57c6', dark: '#3d1a57' },
+  doubloon: { label: 'Doubloon', hex: 0xe8b53a, ui: '#f0c34c', dark: '#8a6414' },
 };
+
+/**
+ * The colour-blind option. Amethyst against ruby and sapphire is the
+ * pair that goes first for most people, so rather than lettering all
+ * five stones the switch replaces that one with a white one: a
+ * different colour, a different value, and a different name.
+ *
+ * GEM_INFO is mutated in place because everything from the card
+ * painter to the 3D materials already holds a reference to it. Whoever
+ * flips this is responsible for repainting what is already drawn --
+ * see applyGemPalette() in main.js.
+ */
+const AMETHYST = { label: 'Amethyst', hex: 0x7b3aa8, ui: '#9b57c6', dark: '#3d1a57' };
+const WHITE_STONE = { label: 'Pearl', hex: 0xe6ded0, ui: '#f2ece0', dark: '#877f6f' };
+
+export function setWhiteGem(on) {
+  Object.assign(GEM_INFO.onyx, on ? WHITE_STONE : AMETHYST);
+}
 
 /** Tier display names. */
 export const TIER_INFO = {

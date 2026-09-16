@@ -50,7 +50,7 @@
   border-bottom: 1px solid rgba(107, 82, 34, 0.35);
 }
 .tooltip__body { color: var(--ink); }
-.tooltip__gems { display: flex; gap: 0.22rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+.tooltip__gems { display: flex; gap: 0.22rem; margin-top: 0.4rem; flex-wrap: wrap; }
 .tooltip__list { margin: 0.3rem 0 0; padding-left: 1.1rem; }
 .tooltip__list li { margin-bottom: 0.18rem; }
 .tooltip__note {
@@ -157,10 +157,13 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /* Sized to the widest thing on a card — the five bonus squares at
-     35px with 3px gaps — so no card trails an empty shelf on a big
-     screen. */
-  width: 222px;
+  /* Sized to the widest row on a card — the six tokens in hand — so
+     they never wrap and no card trails an empty shelf. --token and
+     --seal step the two seal sizes down together on narrow screens,
+     which is cheaper than letting either one wrap. */
+  --token: 0.95rem;
+  --seal: 0.98rem;
+  width: 238px;
   overflow-y: auto;
   max-height: 100%;
   padding-right: 2px;
@@ -181,9 +184,9 @@
 }
 .player-card--winner { box-shadow: var(--shadow-soft), inset 0 0 0 2px var(--brass-bright); }
 
-/* Tight gaps: the card is only as wide as the bonus row now, so the
-   header has to fit a name, a badge and a score inside 195px. */
-.player-card__head { display: flex; align-items: center; gap: 0.3rem; margin-bottom: 0.4rem; }
+/* Tight gaps: the header has to fit a name, a badge and an infamy seal
+   beside each other. */
+.player-card__head { display: flex; align-items: center; gap: 0.28rem; margin-bottom: 0.4rem; }
 .player-card__emblem {
   width: 26px; height: 26px; flex: none;
   border-radius: 2px;
@@ -215,17 +218,17 @@
   border-radius: 2px;
   padding: 1px 4px;
 }
-.player-card__score {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 1.45rem;
-  line-height: 1;
-  color: var(--wood-dark);
-  min-width: 1.4ch;
-  text-align: right;
-}
+/* The score wears the card's infamy seal; see .infamy-seal in base.css. */
+.player-card .infamy-seal { --seal-size: 1.8em; font-size: var(--seal); }
 
-.player-card__gems { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 6px; }
+/* Tokens in hand were half the size of the bonuses below them, which
+   made the smaller of the two numbers the harder one to read. */
+.player-card__gems {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.player-card__gems .gem { font-size: var(--token); }
 
 /* Bonus tally — the headline number on each player card. */
 .bonus-tally {
@@ -245,41 +248,9 @@
   text-align: center;
   margin-bottom: 3px;
 }
-/* Centred and capped: on a wide panel `flex: 1` alone stretched the
-   cells into letterboxes. */
-.bonus-tally__row { display: flex; gap: 3px; justify-content: center; }
-/*
- * Outlined in the gem's own colour rather than filled with it, so a
- * bonus never gets mistaken for a token in hand two rows above.
- */
-.bonus-tally__cell {
-  flex: 1 1 0;
-  max-width: 42px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  border: 2px solid var(--chip);
-  border-radius: 2px;
-  /* Pale parchment, like the card it sits on. The colour identity comes
-     from the border and the digit; a dark fill made both hard to read. */
-  background: linear-gradient(180deg, #fbf3dd, #ecdfbd);
-  box-shadow: inset 0 -2px 3px rgba(122, 96, 52, 0.22);
-}
-.bonus-tally__n {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.95rem;
-  line-height: 1;
-  /* The deep cut of the gem colour, so every one of the five reads
-     against the parchment. */
-  color: var(--chip-dark);
-}
-.bonus-tally__cell--none {
-  border-color: rgba(107, 82, 34, 0.4);
-  background: rgba(36, 24, 17, 0.07);
-  box-shadow: none;
-}
-.bonus-tally__cell--none .bonus-tally__n { color: var(--ink-faint); }
+/* Five seals across, centred. */
+.bonus-tally__row { display: flex; gap: 4px; justify-content: center; }
+.bonus-tally .bonus-disc { font-size: var(--seal); }
 
 .player-card__stat {
   display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
@@ -473,25 +444,70 @@
   writing-mode: vertical-rl;
   transform: rotate(180deg);
 }
+/* A stowed card is the card, at 420x588 like the ones on the table,
+   shown small. Nothing is redrawn or simplified. */
+.hold {
+  --hold-card-w: 94px;
+  --hold-card-h: 132px;
+}
 .hold__cards { display: flex; gap: 0.3rem; }
 .hold__card {
-  width: 80px; height: 110px;
+  width: var(--hold-card-w);
+  height: var(--hold-card-h);
+  padding: 0;
   border: 1px solid var(--brass-dark);
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--parchment), var(--parchment-3));
-  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-  padding: 7px 5px;
+  border-radius: 3px;
+  background: none;
+  overflow: hidden;
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease;
+  transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
   position: relative;
+  display: block;
+}
+.hold__card__face {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  -webkit-user-drag: none;
 }
 .hold__card:hover { transform: translateY(-3px); border-color: var(--brass); }
-.hold__card--blind { background: linear-gradient(180deg, #1b4560, #0d2a3b); }
-.hold__card__pts { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; color: var(--wood-dark); line-height: 1; }
-.hold__card--blind .hold__card__pts { color: var(--brass-bright); }
-.hold__card__bar { width: 100%; height: 9px; background: var(--chip, #999); border: 1px solid rgba(36, 24, 17, 0.5); }
-.hold__card--affordable { box-shadow: inset 0 0 0 1px var(--verdigris-bright); }
-.hold__empty { width: 80px; height: 110px; border: 1px dashed rgba(176, 141, 69, 0.35); border-radius: 2px; }
+/*
+ * Yours to see, nobody else's: a brass edge, and a small glass struck
+ * on the bottom border. It sits on the border rather than in a corner
+ * because both corners of a card are already spoken for -- infamy on
+ * one, the bonus on the other -- and a third disc up there read as a
+ * second score.
+ */
+.hold__card--blind { border-color: var(--brass-bright); }
+.hold__card__blind {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 1px 6px 2px;
+  border-radius: 6px 6px 0 0;
+  background: rgba(18, 11, 5, 0.88);
+  border: 1px solid var(--brass-bright);
+  border-bottom: 0;
+  color: var(--brass-bright);
+  font-family: var(--font-display);
+  font-size: 0.46rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.hold__card--affordable { box-shadow: 0 0 0 2px var(--verdigris-bright); }
+.hold__empty {
+  width: var(--hold-card-w);
+  height: var(--hold-card-h);
+  border: 1px dashed rgba(176, 141, 69, 0.35);
+  border-radius: 3px;
+}
 
 /* ------------------------------------------------------------
    Prompts
@@ -514,6 +530,7 @@
 .prompt-token__taken { font-family: var(--font-display); font-size: 0.64rem; letter-spacing: 0.08em; color: var(--oxblood); }
 
 .lord-choice { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; margin: 1rem 0; }
+.lord-option__req { display: flex; gap: 0.3rem; justify-content: center; }
 .lord-option {
   width: 150px;
   padding: 0.7rem 0.6rem;
@@ -556,17 +573,20 @@
    ------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .players { width: 178px; }
+  .players { width: 196px; --token: 0.82rem; --seal: 0.86rem; }
   .log { display: none; }
 }
 
 @media (max-width: 640px) {
   :root { --hud-gap: 8px; }
-  .players { width: 134px; }
+  .players { width: 152px; --token: 0.64rem; --seal: 0.68rem; }
+  .player-card { padding: 0.5rem 0.5rem; }
+  .player-card__gems { gap: 2px; }
   .player-card__name { font-size: 0.78rem; }
   .action-bar { font-size: 0.85rem; padding: 0.45rem 0.55rem; gap: 0.45rem; }
   .turn-banner__phase { display: none; }
-  .hold__card, .hold__empty { width: 54px; height: 74px; }
+  /* Still a card, so still 420:588. */
+  .hold { --hold-card-w: 56px; --hold-card-h: 78px; }
 }
 
 .inspector__hint {

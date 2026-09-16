@@ -103,12 +103,14 @@ function renderContent(content) {
     return;
   }
   if (content.title) bubble.append(el('div.tooltip__title', {}, content.title));
+  if (content.body) bubble.append(el('div.tooltip__body', {}, content.body));
+  // After the sentence, not before it: a Lord's tile says "needs these
+  // bonuses:" and the colon has to have something to point at.
   if (content.gems) {
     const row = el('div.tooltip__gems');
     for (const [gem, count] of Object.entries(content.gems)) row.append(gemChip(gem, count, { size: 'sm' }));
     bubble.append(row);
   }
-  if (content.body) bubble.append(el('div.tooltip__body', {}, content.body));
   if (content.lines) {
     const list = el('ul.tooltip__list');
     for (const line of content.lines) list.append(el('li', {}, line));

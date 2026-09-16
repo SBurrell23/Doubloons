@@ -2,12 +2,17 @@
 // The in-game HUD. Everything that is not on the table.
 // ============================================================
 
-import { el, button, clear, gemChip, costRow, announce, trapFocus } from './dom.js';
+import {
+  el, button, clear, gemChip, costRow, bonusDisc, infamySeal, announce, trapFocus,
+} from './dom.js';
 import { play } from '../audio/sfx.js';
-import { GEMS, GOLD, ALL_TOKENS, GEM_INFO, TIER_INFO, MAX_TOKENS_HELD, MAX_RESERVED } from '../game/data.js';
+import {
+  GEMS, GOLD, ALL_TOKENS, GEM_INFO, TIER_INFO, MAX_TOKENS_HELD, MAX_RESERVED, LORD_POINTS,
+} from '../game/data.js';
 import { seatDecor } from '../game/session.js';
 import { GLOSSARY, pinTip, unpinTip } from './tooltip.js';
 import { icon, seatEmblem } from './icons.js';
+import { cardFaceImageUrl } from '../three/textures.js';
 
 // ------------------------------------------------------------
 // Derived helpers that work off a client view (no engine access)
@@ -228,6 +233,10 @@ export function createHud(mount, {
       ? { type: 'takeTwo', gem: pending[0] }
       : { type: 'takeThree', gems: [...new Set(pending)] };
     pending = [];
+    // Empty the tray now rather than when the new state lands: the gems
+    // are already on their way, and over a connection that gap is time
+    // spent looking at a choice you have finished making.
+    refreshActionBar();
     refreshBoardHighlights();
     session.submit(action);
   }
@@ -306,7 +315,7 @@ export function createHud(mount, {
       if (lord) {
         content = {
           title: lord.name,
-          body: `${lord.title} — worth 3 infamy. Needs these bonuses:`,
+          body: `${lord.title} — worth ${LORD_POINTS} infamy. Needs these bonuses:`,
           gems: lord.req,
         };
       }
@@ -562,21 +571,21 @@ export function createHud(mount, {
       const gemRow = el('div.player-card__gems');
       for (const token of ALL_TOKENS) {
         const count = player.tokens[token] || 0;
-        gemRow.append(gemChip(token, count, { size: 'sm', dim: count === 0 }));
+        gemRow.append(gemChip(token, count, { dim: count === 0 }));
       }
 
       // Bonuses are the thing you actually plan around, so they get the
-      // most room on the card: a full-width row of stones with the
-      // count struck on each, greyed out at zero.
+      // most room on the card -- and they wear the same seal the cards
+      // on the table do, so there is only one of them to learn.
       const tally = el('div.bonus-tally', { tip: '#bonus' });
       tally.append(el('span.bonus-tally__label', {}, 'Bonuses'));
       const tallyRow = el('div.bonus-tally__row');
       for (const gem of GEMS) {
         const n = bonuses[gem];
-        tallyRow.append(el(`div.bonus-tally__cell${n ? '' : '.bonus-tally__cell--none'}`, {
-          style: { '--chip': GEM_INFO[gem].ui, '--chip-dark': GEM_INFO[gem].dark },
+        tallyRow.append(bonusDisc(gem, n, {
+          empty: !n,
           tip: `${n} ${GEM_INFO[gem].label} bonus${n === 1 ? '' : 'es'}`,
-        }, el('span.bonus-tally__n', {}, String(n))));
+        }));
       }
       tally.append(tallyRow);
 
@@ -588,7 +597,7 @@ export function createHud(mount, {
           el('span.player-card__name', {}, player.name),
           isMe ? el('span.player-card__you', {}, 'YOU') : null,
           player.isAI ? el('span.player-card__ai', {}, 'CPU') : null,
-          el('span.player-card__score', { tip: `${points} of ${target} infamy` }, String(points)),
+          infamySeal(points, { tip: `${points} of ${target} infamy` }),
         ),
         gemRow,
         tally,
@@ -614,21 +623,33 @@ export function createHud(mount, {
     for (const card of player.reserved) {
       const blind = !!card.hidden;
       const canBuy = affordable(card, player);
+      // The card itself, painted once and shown small. A hold card used
+      // to be a colour-coded stand-in, which meant reading the same
+      // card two different ways depending on where it was sitting.
       const node = el('button.hold__card', {
         class: `${blind ? 'hold__card--blind' : ''} ${canBuy && settings.gameplay.highlightAffordable ? 'hold__card--affordable' : ''}`,
         type: 'button',
-        style: { '--chip': GEM_INFO[card.bonus]?.ui || '#888' },
-        tip: blind
-          ? { title: card.name, body: 'Stowed blind — only you can see this one.' }
-          : { title: card.name, body: `${card.points} infamy · ${GEM_INFO[card.bonus].label} bonus` },
+        tip: {
+          title: card.name,
+          body: `${card.points} infamy · ${GEM_INFO[card.bonus].label} bonus`,
+          note: blind ? 'Stowed blind — only you can see this one.' : null,
+        },
         onClick: (event) => {
           play('click');
           const rect = event.currentTarget.getBoundingClientRect();
           showCardInspectorAtRect(card, 'reserve', rect);
         },
       },
-        el('span.hold__card__pts', {}, card.points > 0 ? String(card.points) : '·'),
-        el('span.hold__card__bar'),
+        el('img.hold__card__face', {
+          src: cardFaceImageUrl(card),
+          alt: card.name,
+          draggable: 'false',
+        }),
+        // Face up to you, face down to everyone else.
+        blind
+          ? el('span.hold__card__blind', { 'aria-label': 'Stowed blind' },
+            icon('spyglass', { size: '0.55rem' }), el('span', {}, 'Blind'))
+          : null,
       );
       cards.append(node);
     }
@@ -757,6 +778,11 @@ export function createHud(mount, {
           for (const gem of entry.gems) node.append(gemChip(gem, null, { size: 'sm' }));
           break;
         }
+        case 'undo': {
+          node.append(el('b', {}, entry.who), ' put back ');
+          for (const gem of entry.gems) node.append(gemChip(gem, null, { size: 'sm' }));
+          break;
+        }
         case 'buy':
           node.append(el('b', {}, entry.who), ' bought ', el('i', {}, entry.card),
             entry.points ? ` (+${entry.points})` : '');
@@ -811,6 +837,7 @@ export function createHud(mount, {
     const player = me();
     if (!player) return;
     const excess = view.pending.excess;
+    const undoable = !!view.pending.undo;
     let chosen = {};
 
     const grid = el('div.prompt-grid');
@@ -859,18 +886,33 @@ export function createHud(mount, {
     const modal = el('div.panel.modal', { style: { '--modal-w': '520px' } },
       el('h2.panel__title', {}, 'Too much treasure'),
       el('p.panel__sub', {},
-        `You may only end a turn holding ${MAX_TOKENS_HELD} tokens. Hand back ${excess}.`),
+        `You may only end a turn holding ${MAX_TOKENS_HELD} tokens. Hand back ${excess}`,
+        undoable ? ' — or put the gems you just took back and choose again.' : '.'),
       grid,
       counter,
       el('div.modal__foot', {},
-        button('Let the crew decide', {
-          class: 'btn--ghost',
-          tip: 'Return whatever helps you least.',
-          onClick: () => {
-            closePrompt();
-            session.submit({ type: 'discard', tokens: autoDiscard(player, excess) });
-          },
-        }),
+        // Reaching this prompt is usually a misclick, so the first
+        // thing offered is a way out of it rather than a way through.
+        // If the gems cannot go back -- a stow moved a card, and that
+        // cannot be quietly unmoved -- the crew will choose instead.
+        undoable
+          ? button('Put them back', {
+            class: 'btn--ghost',
+            tip: 'Return the gems to the chest and take your turn again.',
+            onClick: () => {
+              play('cardSlide');
+              closePrompt();
+              session.submit({ type: 'undoTake' });
+            },
+          })
+          : button('Let the crew decide', {
+            class: 'btn--ghost',
+            tip: 'Return whatever helps you least.',
+            onClick: () => {
+              closePrompt();
+              session.submit({ type: 'discard', tokens: autoDiscard(player, excess) });
+            },
+          }),
         confirm,
       ),
     );
@@ -914,10 +956,11 @@ export function createHud(mount, {
           session.submit({ type: 'chooseLord', lordId: lord.id });
         },
       },
-        el('div.lord-option__mark', {}, icon('skull', { size: '1.4rem' })),
+        el('div.lord-option__mark', {}, infamySeal(LORD_POINTS, { size: 'lg' })),
         el('div.lord-option__name', {}, lord.name),
         el('div.lord-option__title', {}, lord.title),
-        costRow(lord.req, { size: 'sm' }),
+        el('div.lord-option__req', {},
+          ...Object.entries(lord.req).map(([gem, n]) => bonusDisc(gem, n))),
       ));
     }
 
@@ -1017,6 +1060,7 @@ export function createHud(mount, {
           play('lord');
           break;
         case 'discard':
+        case 'undo':
           play('cardSlide');
           break;
         case 'gameOver':

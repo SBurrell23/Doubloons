@@ -75,16 +75,29 @@ function miniCard(x, y, w, h, { bonus = 'sapphire', points = 2, cost = { pearl: 
     }),
   );
 
+  // Infamy and the bonus wear the same two seals a real card does --
+  // this is the picture people learn the card from, so it had better
+  // be a picture of the card.
+  const bandY = y + h * 0.145;
+  const sealR = w * 0.165;
+  const seal = (cx) => svg('circle', {
+    cx, cy: bandY, r: sealR,
+    fill: 'rgba(18,11,5,0.78)', stroke: '#dcb968', 'stroke-width': Math.max(1.2, sealR * 0.12),
+  });
+
   if (points > 0) {
-    group.append(svg('text', {
-      x: x + w * 0.16, y: y + h * 0.20,
-      'text-anchor': 'middle', 'dominant-baseline': 'middle',
-      'font-size': h * 0.17, 'font-weight': '700',
-      'font-family': 'Cinzel, Georgia, serif',
-      fill: '#f7eed9', stroke: 'rgba(20,12,4,0.9)', 'stroke-width': h * 0.02, 'paint-order': 'stroke',
-    }, String(points)));
+    group.append(
+      seal(x + w * 0.2),
+      svg('text', {
+        x: x + w * 0.2, y: bandY,
+        'text-anchor': 'middle', 'dominant-baseline': 'central',
+        'font-size': sealR * 1.32, 'font-weight': '700',
+        'font-family': 'Cinzel, Georgia, serif',
+        fill: '#ffeec2',
+      }, String(points)),
+    );
   }
-  group.append(gemShape(x + w * 0.78, y + h * 0.14, w * 0.13, bonus));
+  group.append(seal(x + w * 0.8), gemShape(x + w * 0.8, bandY, sealR * 0.72, bonus));
 
   if (name) {
     group.append(svg('text', {

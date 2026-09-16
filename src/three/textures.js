@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 import { createNoise, rng } from './noise.js';
-import { GEM_INFO, TIER_INFO } from '../game/data.js';
+import { GEM_INFO, TIER_INFO, LORD_POINTS } from '../game/data.js';
 import { drawCardArt, ART_PALETTE } from './cardart/index.js';
 import { LORD_ART } from './cardart/lords.js';
 
@@ -39,6 +39,20 @@ export function disposeTextures() {
     if (value?.dispose) value.dispose();
   }
   cache.clear();
+}
+
+/**
+ * Drop everything with a gem painted into it, leaving the island's
+ * sand and timber alone. Swapping the amethyst for a white stone has
+ * to repaint ninety card faces and ten Lord tiles; it does not have to
+ * repaint the beach.
+ */
+export function disposeGemArt() {
+  for (const [key, value] of cache) {
+    if (!/^(card|lord|face-url|back-url):/.test(key)) continue;
+    if (value?.dispose) value.dispose();
+    cache.delete(key);
+  }
 }
 
 // ------------------------------------------------------------
@@ -313,6 +327,7 @@ export function drawGem(ctx, cx, cy, r, gem, { outline = true } = {}) {
  */
 export function drawGemWithCount(ctx, cx, cy, r, gem, amount) {
   drawGem(ctx, cx, cy, r, gem);
+  ctx.save();
 
   // A dark lozenge behind the digit so it reads against any facet.
   ctx.save();
@@ -331,6 +346,53 @@ export function drawGemWithCount(ctx, cx, cy, r, gem, amount) {
   ctx.textBaseline = 'middle';
   ctx.strokeText(String(amount), cx, cy + r * 0.12);
   ctx.fillText(String(amount), cx, cy + r * 0.12);
+  ctx.restore();
+}
+
+/*
+ * The two seals the whole game is read through.
+ *
+ * A bonus is a gem sunk in a dark disc with a brass ring; infamy is the
+ * same disc with a number struck on it. They started life on the card
+ * face and nowhere else, which left the Lord tiles and the player cards
+ * describing the same two things in three different visual languages.
+ * They live here now, and everything that shows a bonus or a score
+ * draws them from here -- see .bonus-disc and .infamy-seal in the CSS
+ * for the DOM's half of the same pair.
+ */
+export const SEAL_FILL = 'rgba(18,11,5,0.78)';
+export const SEAL_RING = '#dcb968';
+
+function seal(ctx, cx, cy, r, ringWidth) {
+  ctx.save();
+  ctx.fillStyle = SEAL_FILL;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = SEAL_RING;
+  ctx.lineWidth = ringWidth;
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A bonus: the stone itself, sunk in the seal. */
+export function drawBonusDisc(ctx, cx, cy, r, gem, amount = null) {
+  seal(ctx, cx, cy, r, Math.max(3, r * 0.08));
+  const gemR = r * 0.72;
+  if (amount === null) drawGem(ctx, cx, cy + r * 0.04, gemR, gem);
+  else drawGemWithCount(ctx, cx, cy + r * 0.04, gemR, gem, amount);
+}
+
+/** Infamy: the same seal with the number struck on it. */
+export function drawInfamySeal(ctx, cx, cy, r, points) {
+  seal(ctx, cx, cy, r, Math.max(3, r * 0.085));
+  ctx.save();
+  ctx.fillStyle = '#ffeec2';
+  ctx.font = `700 ${Math.round(r * 1.32)}px Cinzel, Georgia, serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(points), cx, cy + r * 0.06);
+  ctx.restore();
 }
 
 /** Gold coin face, for doubloons. */
@@ -466,37 +528,12 @@ export function cardFaceCanvas(card) {
 
   // --- infamy, top-left, on a dark seal so it reads at any distance ---
   if (card.points > 0) {
-    const px = 78;
-    const py = 12 + band / 2;
-    ctx.fillStyle = 'rgba(18,11,5,0.75)';
-    ctx.beginPath();
-    ctx.arc(px, py, 47, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#dcb968';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffeec2';
-    ctx.font = '700 62px Cinzel, Georgia, serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(String(card.points), px, py + 3);
+    drawInfamySeal(ctx, 78, 12 + band / 2, 47, card.points);
   }
 
-  // --- bonus gem, top-right, on a dark disc so it separates from
-  // the band behind it (which is the same colour) ---
-  {
-    const gx = CARD_W - 86;
-    const gy = 12 + band / 2;
-    ctx.fillStyle = 'rgba(18,11,5,0.7)';
-    ctx.beginPath();
-    ctx.arc(gx, gy, 50, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#dcb968';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    drawGem(ctx, gx, gy + 2, 36, card.bonus);
-  }
+  // --- bonus gem, top-right, sunk in the same seal so it separates
+  // from the band behind it (which is the same colour) ---
+  drawBonusDisc(ctx, CARD_W - 86, 12 + band / 2, 50, card.bonus);
 
   // --- name ---
   ctx.fillStyle = '#241a10';
@@ -618,6 +655,20 @@ export function cardBackCanvas(tier) {
   return el;
 }
 
+/**
+ * The card face as an image the DOM can show. Your hold used to draw
+ * its own small approximation of a card; it shows the real one now,
+ * just smaller, so what is in your hand looks like what is on the
+ * table.
+ */
+export function cardFaceImageUrl(card) {
+  return memo(`face-url:${card.id}`, () => cardFaceCanvas(card).toDataURL());
+}
+
+export function cardBackImageUrl(tier) {
+  return memo(`back-url:${tier}`, () => cardBackCanvas(tier).toDataURL());
+}
+
 export function cardBackTexture(tier) {
   return memo(`back:${tier}`, () => finish(cardBackCanvas(tier), { aniso: 8 }));
 }
@@ -666,27 +717,18 @@ export function lordCanvas(lord) {
   ctx.lineTo(px + pw, py + ph);
   ctx.stroke();
 
-  // The seal sits over the portrait's corner, like a stamp on a warrant.
+  // The seal sits over the portrait's corner, like a stamp on a warrant
+  // -- the same seal a card wears, because it is the same three infamy.
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowBlur = 10;
-  ctx.fillStyle = '#9c2b2b';
-  ctx.beginPath();
-  ctx.arc(74, 74, 42, 0, Math.PI * 2);
-  ctx.fill();
+  drawInfamySeal(ctx, 74, 74, 42, LORD_POINTS);
   ctx.restore();
-  ctx.strokeStyle = '#d9b978';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(74, 74, 42, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = '#ffe9c0';
-  ctx.font = '700 46px Cinzel, Georgia, serif';
+
+  // Name. Alignment is set here rather than inherited from whatever
+  // drew last -- that is how the name ended up running off the edge.
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('3', 74, 78);
-
-  // Name.
   ctx.fillStyle = '#3a2410';
   ctx.font = '600 27px Cinzel, Georgia, serif';
   wrapText(ctx, lord.name, size / 2, 276, size - 70, 32);
@@ -694,12 +736,12 @@ export function lordCanvas(lord) {
   ctx.font = 'italic 21px Spectral, Georgia, serif';
   ctx.fillText(lord.title, size / 2, 308);
 
-  // Requirements.
+  // Requirements -- bonuses, so they wear the bonus seal.
   const reqs = Object.entries(lord.req);
   const gap = 104;
   const startX = size / 2 - ((reqs.length - 1) * gap) / 2;
   reqs.forEach(([gem, n], i) => {
-    drawGemWithCount(ctx, startX + i * gap, 372, 40, gem, n);
+    drawBonusDisc(ctx, startX + i * gap, 366, 46, gem, n);
   });
 
   return el;

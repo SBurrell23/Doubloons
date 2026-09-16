@@ -10,6 +10,7 @@ import './ui/styles/screens.css';
 import './ui/styles/game.css';
 
 import { createWorld, TABLE_VIEW, ISLAND_VIEW } from './three/scene.js';
+import { disposeGemArt } from './three/textures.js';
 import { createBoard } from './three/board.js';
 import { createHud } from './ui/hud.js';
 import { renderTitle, renderLobby } from './ui/lobby.js';
@@ -29,6 +30,7 @@ import {
   HostSession, ClientSession, SoloSession, cleanName,
   loadHostSnapshot, forgetHostSnapshot,
 } from './game/session.js';
+import { setWhiteGem } from './game/data.js';
 
 const sceneMount = document.getElementById('scene');
 const uiMount = document.getElementById('ui');
@@ -67,7 +69,7 @@ async function start() {
   installCursor();
   installTooltips();
   setTooltipsEnabled(settings.gameplay.tooltips);
-  document.body.classList.toggle('cb-labels', settings.gameplay.colourblindLabels);
+  applyGemPalette(settings.gameplay.whiteGem);
 
   // The card and tile textures are painted with Canvas2D, so the display
   // face has to be loaded first or they bake with the fallback serif.
@@ -153,8 +155,39 @@ function applyAudio(audio) {
 
 function applyGameplay(gameplay) {
   setTooltipsEnabled(gameplay.tooltips);
-  document.body.classList.toggle('cb-labels', gameplay.colourblindLabels);
+  if (gameplay.whiteGem !== whiteGemApplied) {
+    applyGemPalette(gameplay.whiteGem);
+    repaintTable();
+  }
   hud?.refreshGameplaySettings();
+}
+
+/*
+ * The colour-blind switch changes a gem's actual colour rather than
+ * annotating it, so it reaches further than a class on the body: the
+ * stones on the table are a material, and the card faces and Lord tiles
+ * are paintings with the old colour baked in.
+ */
+let whiteGemApplied = null;
+function applyGemPalette(on) {
+  whiteGemApplied = !!on;
+  setWhiteGem(!!on);
+  document.body.classList.toggle('gem-white', !!on);
+}
+
+/** Throw away the paintings with the old stone in them and redraw. */
+function repaintTable() {
+  disposeGemArt();
+  if (screen !== 'table' || !world || !session?.view) return;
+  // The board and the HUD hold each other, so they come back together.
+  // The log is replayed from the view, so nothing is lost -- but the
+  // camera would snap back to the default table shot, so it is put back
+  // where the player left it. (state.target is live; clone it.)
+  const { yaw, pitch, dist, target } = world.rig.state;
+  const where = { yaw, pitch, dist, target: target.clone() };
+  teardownGame();
+  showTable();
+  world.rig.moveTo({ ...where, instant: true });
 }
 
 onSettingsChange((all, patch) => {

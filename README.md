@@ -187,7 +187,8 @@ Reachable anywhere with the cog, or <kbd>Esc</kbd> when nothing else is open.
 - **Graphics** — frame cap, antialiasing, shadows, resolution scale,
   ocean detail, field of view, wildlife, FPS readout
 - **Gameplay** — tooltips, purchase confirmation, affordability
-  highlighting, animation speed, colour-blind gem labels
+  highlighting, animation speed, a white stone in place of the
+  amethyst for colour-blind play
 - **Controls** — the camera and keyboard reference
 
 Lobby options include the infamy target, a turn timer (which auto-plays

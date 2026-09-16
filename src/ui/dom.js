@@ -1,7 +1,6 @@
 // Minimal DOM helpers. No framework; the UI is small enough.
 
 import { play } from '../audio/sfx.js';
-import { GEM_INFO } from '../game/data.js';
 
 /**
  * el('div.foo#bar', { attrs }, ...children)
@@ -170,18 +169,39 @@ export function field(label, control, hint) {
   );
 }
 
-/**
- * A gem chip with an optional count. The three-letter code is always
- * rendered but only shown when colour-blind labels are switched on.
- */
+/** A gem chip with an optional count. */
 export function gemChip(gem, count = null, { size = '', dim = false, tip = null } = {}) {
   const classes = ['gem', `gem--${gem}`];
   if (size) classes.push(`gem--${size}`);
   if (dim) classes.push('gem--empty');
   return el(`span.${classes.join('.')}`, { tip },
     count === null ? null : el('span', {}, String(count)),
-    el('span.gem__code', { 'aria-hidden': 'true' }, GEM_INFO[gem]?.short || ''),
   );
+}
+
+/**
+ * A bonus, drawn the way the cards draw it: the stone sunk in a dark
+ * disc with a brass ring. The player panels and the Lord tiles used to
+ * each have their own idea of what a bonus looked like; this is the
+ * card's, which is the one people learn first.
+ *
+ * `drawBonusDisc` in three/textures.js is the same thing in Canvas2D.
+ */
+export function bonusDisc(gem, count = null, { size = '', tip = null, empty = false } = {}) {
+  const classes = ['bonus-disc'];
+  if (size) classes.push(`bonus-disc--${size}`);
+  if (empty) classes.push('bonus-disc--none');
+  return el(`span.${classes.join('.')}`, { tip },
+    el(`span.bonus-disc__gem.gem.gem--${gem}`),
+    count === null ? null : el('span.bonus-disc__n', {}, String(count)),
+  );
+}
+
+/** Infamy, in the same seal as the one struck on a card. */
+export function infamySeal(points, { size = '', tip = null } = {}) {
+  const classes = ['infamy-seal'];
+  if (size) classes.push(`infamy-seal--${size}`);
+  return el(`span.${classes.join('.')}`, { tip }, String(points));
 }
 
 /** Format a cost object as a row of gem chips. */

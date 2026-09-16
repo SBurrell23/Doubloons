@@ -480,6 +480,17 @@ body { touch-action: none; }
 .gem--emerald { --gem-color: var(--gem-emerald); }
 .gem--ruby { --gem-color: var(--gem-ruby); }
 .gem--onyx { --gem-color: var(--gem-onyx); }
+/*
+ * The colour-blind switch. Amethyst against ruby and sapphire is the
+ * pair that goes first, so the option swaps that one stone for a white
+ * one rather than lettering all five. The 3D stones and the painted
+ * card faces are swapped in data.js to match.
+ */
+body.gem-white .gem--onyx {
+  --gem-color: #f2ece0;
+  color: #241a10;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
 .gem--doubloon { --gem-color: var(--gem-doubloon); color: #241a10; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55); }
 .gem--doubloon::before,
 .gem--doubloon::after { clip-path: circle(47% at 50% 50%); }
@@ -487,24 +498,75 @@ body { touch-action: none; }
 .gem--lg { font-size: 1.2rem; }
 .gem--empty { opacity: 0.25; filter: grayscale(0.85); }
 
-/* Colour-blind letter codes */
-.gem__code {
+.gem-row { display: inline-flex; gap: 0.28rem; align-items: center; flex-wrap: wrap; }
+
+/* ------------------------------------------------------------
+   Bonus discs and infamy seals — the card's own two marks
+   ------------------------------------------------------------
+
+   A card shows a bonus as a stone sunk in a dark disc with a brass
+   ring, and infamy as the same disc with a number on it. Everything
+   that shows either — the Lord tiles, the player panels, the Lord
+   choice — wears the same two marks, so a bonus never has to be
+   learned twice. drawBonusDisc/drawInfamySeal paint the canvas twins.
+   ------------------------------------------------------------ */
+
+.bonus-disc,
+.infamy-seal {
+  --seal-size: 1.85em;
+  display: inline-grid;
+  place-items: center;
+  position: relative;
+  width: var(--seal-size);
+  height: var(--seal-size);
+  flex: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #35271a, #120b05 72%);
+  border: 2px solid var(--brass-bright);
+  box-shadow: inset 0 0 0.25em rgba(0, 0, 0, 0.7), 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.bonus-disc { font-size: 0.88rem; }
+
+/* The stone itself, at the size the seal leaves it. */
+.bonus-disc__gem {
+  width: 1.32em;
+  height: 1.32em;
+  font-size: inherit;
+}
+
+/* The count is struck across the stone, the way the cards print it. */
+.bonus-disc__n {
   position: absolute;
-  bottom: -0.62em;
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--font-mono);
-  font-size: 0.52em;
-  letter-spacing: 0.04em;
-  color: var(--ink-soft);
-  text-shadow: none;
+  font-size: 0.92em;
+  color: #fff6df;
+  text-shadow:
+    0 0 2px rgba(8, 5, 2, 0.95), 0 0 3px rgba(8, 5, 2, 0.95),
+    0 1px 0 rgba(8, 5, 2, 0.95), 0 -1px 0 rgba(8, 5, 2, 0.95),
+    1px 0 0 rgba(8, 5, 2, 0.95), -1px 0 0 rgba(8, 5, 2, 0.95);
   z-index: 2;
 }
-.panel--dark .gem__code, .players .gem__code { color: rgba(233, 220, 189, 0.75); }
-body:not(.cb-labels) .gem__code { display: none; }
-body.cb-labels .gem { margin-bottom: 0.55em; }
 
-.gem-row { display: inline-flex; gap: 0.28rem; align-items: center; flex-wrap: wrap; }
+/* A bonus you do not have yet: the seal, empty, quietly. */
+.bonus-disc--none {
+  border-color: rgba(176, 141, 69, 0.4);
+  background: radial-gradient(circle at 34% 28%, #2a2018, #140d07 72%);
+  box-shadow: none;
+}
+.bonus-disc--none .bonus-disc__gem { opacity: 0.3; filter: grayscale(0.7); }
+.bonus-disc--none .bonus-disc__n { color: rgba(233, 220, 189, 0.5); }
+
+.infamy-seal {
+  font-size: 0.92rem;
+  color: #ffeec2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.bonus-disc--sm, .infamy-seal--sm { font-size: 0.74rem; }
+.bonus-disc--lg, .infamy-seal--lg { font-size: 1.15rem; }
 
 /* ------------------------------------------------------------
    Utility

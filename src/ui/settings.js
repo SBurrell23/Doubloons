@@ -354,14 +354,14 @@ function gameplayTab(settings, patch) {
       }),
     ),
 
-    field('Colour-blind labels',
+    field('Colour-blind',
       toggle({
-        value: p.colourblindLabels,
-        label: 'Letter each gem colour',
-        tip: 'Adds Prl / Sph / Eme / Rby / Onx to gem chips.',
-        onChange: (v) => patch('gameplay', { colourblindLabels: v }),
+        value: p.whiteGem,
+        label: 'White stone instead of amethyst',
+        tip: 'Swaps the purple gem for a white one, on the table and everywhere else.',
+        onChange: (v) => patch('gameplay', { whiteGem: v }),
       }),
-    ),
+      'Purple against red and blue is the pair that goes first.'),
   );
 }
 

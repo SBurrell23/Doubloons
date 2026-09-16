@@ -129,6 +129,14 @@ function pickAction(session, rand) {
   return pool[Math.floor(rand() * pool.length)];
 }
 
+/** Move tokens from the chest into a hand, so the totals still add up. */
+function give(state, player, tokens) {
+  for (const [gem, n] of Object.entries(tokens)) {
+    player.tokens[gem] += n;
+    state.supply[gem] -= n;
+  }
+}
+
 /** Hand back the excess, largest piles first. */
 function shed(player, excess) {
   const tokens = {};
@@ -517,6 +525,7 @@ async function testHostileClient() {
     { type: 'action', action: { type: 'discard', tokens: { ruby: -5 } } },
     { type: 'action', action: { type: 'discard', tokens: 'lots' } },
     { type: 'action', action: { type: '__proto__' } },
+    { type: 'action', action: { type: 'undoTake' } },
     { type: 'action', action: { type: 'purchase', from: 'reserve', cardId: 'nope' } },
     { type: 'chat', text: 'x'.repeat(100000) },
     { type: 'rename', name: { toString() { return 'boom'; } } },
@@ -621,6 +630,79 @@ async function testFractionalPaymentRefused() {
   await table.settle(60);
   check(player.cards.some((c) => c.id === card.id), 'paying the real price still buys the card');
 
+  table.teardown();
+}
+
+/**
+ * Taking a gem grab back. It has to put the game exactly where it was,
+ * and it has to be refused every other time it is asked for.
+ */
+async function testUndoTake() {
+  const table = new Table({ humans: 2, seed: 23, passive: true });
+  await table.open();
+  table.start();
+  await table.settle(40);
+
+  const client = table.clients[0];
+  const state = table.host.state;
+  const seat = state.players.findIndex((p) => p.id === client.myId);
+  const player = state.players[seat];
+  state.current = seat;
+
+  // Eight in hand: any three more puts them over. Moved out of the
+  // chest rather than conjured, so conservation still holds.
+  give(state, player, { pearl: 3, sapphire: 3, emerald: 2 });
+
+  // Asking to take one back when nothing was taken is refused.
+  const quiet = state.version;
+  client.net.send({ type: 'action', action: { type: 'undoTake' } });
+  await table.settle(60);
+  check(table.host.state.version === quiet, 'nothing to take back, nothing happens');
+
+  const before = {
+    supply: { ...state.supply },
+    tokens: { ...player.tokens },
+    turnsTaken: state.turnsTaken,
+    current: state.current,
+    idleTurns: state.idleTurns,
+    consecutivePasses: state.consecutivePasses,
+  };
+
+  client.net.send({ type: 'action', action: { type: 'takeThree', gems: ['ruby', 'onyx', 'emerald'] } });
+  await table.settle(60);
+  check(table.host.state.phase === 'discard', 'over the limit, so tokens must come back');
+  check(!!table.host.state.pending.undo, 'and the take is offered back');
+
+  client.net.send({ type: 'action', action: { type: 'undoTake' } });
+  await table.settle(60);
+
+  const after = table.host.state;
+  check(after.phase === 'playing', 'back to playing');
+  check(after.pending === null, 'nothing pending');
+  check(JSON.stringify(after.players[seat].tokens) === JSON.stringify(before.tokens),
+    'their hand is exactly as it was');
+  check(JSON.stringify(after.supply) === JSON.stringify(before.supply),
+    'the chest is exactly as it was');
+  check(after.current === before.current && after.turnsTaken === before.turnsTaken,
+    'still their turn, and the turn count did not move');
+  check(after.idleTurns === before.idleTurns && after.consecutivePasses === before.consecutivePasses,
+    'the deadlock counters never saw the take');
+
+  // And it cannot be asked for twice.
+  const settled = after.version;
+  client.net.send({ type: 'action', action: { type: 'undoTake' } });
+  await table.settle(60);
+  check(table.host.state.version === settled, 'a take can only be put back once');
+
+  // A stow that goes over the limit is not offered back: a card moved.
+  give(state, player, { pearl: 1, emerald: 1 });
+  const card = table.host.state.board[1].find(Boolean);
+  client.net.send({ type: 'action', action: { type: 'reserve', cardId: card.id } });
+  await table.settle(60);
+  check(table.host.state.phase === 'discard', 'stowing over the limit still asks for tokens back');
+  check(!table.host.state.pending.undo, 'but a stow cannot be taken back');
+
+  check(!invariants(table.host.state, 'undo').length, 'invariants held throughout');
   table.teardown();
 }
 
@@ -742,6 +824,7 @@ await test('a collapsed room comes back on the same code', testRoomCollapseAndRe
 await test('the host can reload and pick the voyage back up', testHostReloadResume);
 await test('a hostile client cannot corrupt the game', testHostileClient);
 await test('fractional payments are refused, whole ones are not', testFractionalPaymentRefused);
+await test('a gem grab can be taken back, once, and only when it can', testUndoTake);
 await test('a held table refuses every move', testPausedTableRefusesMoves);
 await test('a rematch drops seats nobody came back to', testRematchPrunesStrandedSeats);
 await test('the turn clock plays for a silent seat', testTurnTimerAutoPlays);
